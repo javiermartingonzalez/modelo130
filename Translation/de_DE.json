@@ -11,6 +11,7 @@
     "download-aeat-file": "AEAT-Datei herunterladen",
     "exists-accounting-130": "Es existiert bereits ein Buchungssatz im Geschäftsjahr %codejercicio% mit dem Verwendungszweck: %concepto%",
     "expense": "Abzugsfähige Ausgabe",
+    "fractional-payment": "Vorauszahlung vorheriges Quartal",
     "gastos-justificacion": "Schwer belegbare Ausgaben",
     "gastos-justificacion-limit": "Achtung: Der Betrag überschreitet das jährliche Limit von 2.000 €",
     "gastos-justificacion-pct": "% Schwer belegbare Ausgaben",
@@ -26,5 +27,5 @@
     "previous-payment": "Vorherige Vorauszahlung",
     "tax-expenses": "Absetzbare Ausgaben",
     "tax-incomes": "Steuerbare Einkommen",
-    "tax-negative-info": "Wenn Verluste (negativ) = 0 sind"
+    "tax-negative-info": "Wenn 07 negativ ist (Verlust) = 0"
 }

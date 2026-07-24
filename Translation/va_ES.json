@@ -4,6 +4,7 @@
     "after-deduct": "sobre casella 04",
     "deductible-subaccounts": "Comptes deduïbles",
     "exists-accounting-130": "Ja existeix un assentament a l'exercici %codejercicio% amb el concepte: %concepto%",
+    "fractional-payment": "Pagament fraccionat trimestre anterior",
     "gastos-justificacion": "Despeses de difícil justificació",
     "gastos-justificacion-limit": "Atenció: l'import supera el límit anual de 2.000 €",
     "gastos-justificacion-pct": "% Despeses de difícil justificació",
@@ -17,5 +18,5 @@
     "previous-model": "Ingressos trimestrals anteriors",
     "tax-expenses": "Despeses deduïbles",
     "tax-incomes": "Ingressos computables",
-    "tax-negative-info": "Si dóna pèrdues (negatiu) = 0"
+    "tax-negative-info": "Si 07 dona pèrdues (negatiu) = 0"
 }

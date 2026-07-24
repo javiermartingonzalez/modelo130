@@ -11,6 +11,7 @@
     "download-aeat-file": "Deskargatu AEAT fitxategia",
     "exists-accounting-130": "Dagoeneko badago idazpen bat %codejercicio% ekitaldian %concepto% kontzeptuarekin",
     "expense": "Gastu kengarria",
+    "fractional-payment": "Aurreko hiruhilekoko zatikako ordainketa",
     "gastos-justificacion": "Zail justifikatzen diren gastuak",
     "gastos-justificacion-limit": "Kontuz: zenbatekoa urteko 2.000 €-ko muga gainditzen du",
     "gastos-justificacion-pct": "% Zail justifikatzen diren gastuak",
@@ -26,5 +27,5 @@
     "previous-payment": "Aurreko ordainketa zatikatua",
     "tax-expenses": "Gastu kengarriak",
     "tax-incomes": "Errenta konputagarria",
-    "tax-negative-info": "Galerak ematen baditu (negatiboak) = 0"
+    "tax-negative-info": "07 galerak badira (negatiboa) = 0"
 }

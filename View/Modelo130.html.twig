@@ -185,10 +185,19 @@
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg-3">
                     <div class="mb-3">
-                        {{ trans('result') }}
+                        {{ trans('fractional-payment') }}
                         <div class="input-group">
                             <span class="input-group-text">07</span>
-                            <input type="number" value="{{ fsc.result.result }}" class="form-control text-end" readonly/>
+                            <input type="number" value="{{ fsc.result.fractionalPayment }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        <strong>{{ trans('result') }}</strong>
+                        <div class="input-group">
+                            <span class="input-group-text">19</span>
+                            <input type="number" value="{{ fsc.result.result }}" class="form-control text-end fw-bold" readonly/>
                         </div>
                         <p class="form-text text-muted">{{ trans('tax-negative-info') }}</p>
                     </div>

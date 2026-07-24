@@ -4,6 +4,7 @@
     "after-deduct": "na rubrykę 04",
     "deductible-subaccounts": "Podkonty do odliczeń",
     "exists-accounting-130": "Istnieje już zapis księgowy w okresie %codejercicio% o treści: %concepto%",
+    "fractional-payment": "Zaliczka za poprzedni kwartał",
     "gastos-justificacion": "Wydatki trudne do uzasadnienia",
     "gastos-justificacion-limit": "Uwaga: kwota przekracza roczny limit 2 000 €",
     "gastos-justificacion-pct": "% Wydatki trudne do uzasadnienia",
@@ -17,5 +18,5 @@
     "previous-model": "Poprzednie kwartały dochodów",
     "tax-expenses": "Wydatki podatkowe",
     "tax-incomes": "Dochody opodatkowane",
-    "tax-negative-info": "Jeśli wykazuje straty (ujemny) = 0"
+    "tax-negative-info": "Jeśli 07 oznacza stratę (ujemne) = 0"
 }

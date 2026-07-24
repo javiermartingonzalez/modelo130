@@ -11,6 +11,7 @@
     "download-aeat-file": "Scarica file AEAT",
     "exists-accounting-130": "Esiste già una registrazione nell'esercizio %codejercicio% con la causale: %concepto%",
     "expense": "Spesa deducibile",
+    "fractional-payment": "Acconto del trimestre precedente",
     "gastos-justificacion": "Spese di difficile giustificazione",
     "gastos-justificacion-limit": "Attenzione: l'importo supera il limite annuo di 2.000 €",
     "gastos-justificacion-pct": "% Spese di difficile giustificazione",
@@ -26,5 +27,5 @@
     "previous-payment": "Acconto precedente",
     "tax-expenses": "Spese fiscali deducibili",
     "tax-incomes": "Ricavi fiscali",
-    "tax-negative-info": "Se genera perdite (negative) = 0"
+    "tax-negative-info": "Se 07 è in perdita (negativo) = 0"
 }

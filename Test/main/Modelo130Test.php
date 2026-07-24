@@ -84,6 +84,7 @@ final class Modelo130Test extends TestCase
             'gastosJustificacion',
             'afterdeduct',
             'positivosTrimestres',
+            'fractionalPayment',
             'result',
         ];
 
@@ -222,19 +223,33 @@ final class Modelo130Test extends TestCase
      * Verifica que el resultado final nunca es negativo tras descontar
      * retenciones e ingresos de trimestres anteriores.
      */
-    public function testCalcResult(): void
+    public function testCalcFractionalPayment(): void
     {
         // caso normal: 2.000 - 500 - 300 = 1.200
-        $this->assertSame(1200.0, Modelo130::calcResult(2000.0, 500.0, 300.0));
+        $this->assertSame(1200.0, Modelo130::calcFractionalPayment(2000.0, 500.0, 300.0));
 
-        // resultado negativo: la casilla no baja de 0
-        $this->assertSame(0.0, Modelo130::calcResult(500.0, 400.0, 300.0));
+        // resultado negativo
+        $this->assertSame(-200.0, Modelo130::calcFractionalPayment(500.0, 400.0, 300.0));
 
         // resultado exactamente 0
-        $this->assertSame(0.0, Modelo130::calcResult(100.0, 50.0, 50.0));
+        $this->assertSame(0.0, Modelo130::calcFractionalPayment(100.0, 50.0, 50.0));
 
         // redondeo a 2 decimales
-        $this->assertSame(33.33, Modelo130::calcResult(100.005, 33.33, 33.345));
+        $this->assertSame(33.33, Modelo130::calcFractionalPayment(100.005, 33.33, 33.345));
+    }
+
+    /**
+     * Verifica que el resultado final nunca es negativo 
+     * en base al pago fraccionado previo del trimestre.
+     */
+    public function testCalcResult(): void
+    {
+        // caso normal: 1.200
+        $this->assertSame(1200.0, Modelo130::calcResult(1200.0));
+        // resultado negativo: la casilla no baja de 0
+        $this->assertSame(0.0, Modelo130::calcResult(-200.0));
+        // resultado exactamente 0
+        $this->assertSame(0.0, Modelo130::calcResult(0.0));
     }
 
     protected function tearDown(): void

@@ -4,6 +4,7 @@
     "after-deduct": "sobre casilla 03",
     "deductible-subaccounts": "Cuentas deducibles",
     "exists-accounting-130": "Ya existe un asiento en el ejercicio %codejercicio% con el concepto: %concepto%",
+    "fractional-payment": "Pago fraccionado previo trimestre",
     "gastos-justificacion": "Gastos de difícil justificación",
     "gastos-justificacion-limit": "Atención: el importe supera el límite anual de 2.000 €",
     "gastos-justificacion-pct": "% Gastos de difícil justificación",
@@ -17,5 +18,5 @@
     "previous-model": "Ingresos trimestres anteriores",
     "tax-expenses": "Gastos deducibles",
     "tax-incomes": "Ingresos computables",
-    "tax-negative-info": "Si da pérdidas (negativo) = 0"
+    "tax-negative-info": "Si 07 da pérdidas (negativo) = 0"
 }

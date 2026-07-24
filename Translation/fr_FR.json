@@ -11,6 +11,7 @@
     "download-aeat-file": "Télécharger le fichier AEAT",
     "exists-accounting-130": "Il existe déjà une écriture pour l'exercice %codejercicio% avec le libellé : %concepto%",
     "expense": "Dépense déductible",
+    "fractional-payment": "Acompte du trimestre précédent",
     "gastos-justificacion": "Dépenses difficiles à justifier",
     "gastos-justificacion-limit": "Attention: le montant dépasse la limite annuelle de 2.000 €",
     "gastos-justificacion-pct": "% Dépenses difficiles à justifier",
@@ -26,5 +27,5 @@
     "previous-payment": "Paiement fractionné précédent",
     "tax-expenses": "Dépenses déductibles",
     "tax-incomes": "Revenu éligible",
-    "tax-negative-info": "Si déficitaire (négatif) = 0"
+    "tax-negative-info": "Si 07 est déficitaire (négatif) = 0"
 }

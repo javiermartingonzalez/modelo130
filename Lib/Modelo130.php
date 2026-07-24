@@ -271,25 +271,32 @@ class Modelo130
         );
     }
 
+
     /**
-     * Calcula el resultado final del modelo (casilla 07) restando retenciones e
-     * ingresos de trimestres anteriores. Si el resultado es negativo, la
-     * casilla no puede ser negativa.
+     * Calcula el pago fraccionado previo del trimestre (casilla 07) 
+     * restando retenciones e ingresos de trimestres anteriores.
+     * Si el resultado es negativo, el pago fraccionado no puede ser negativo.
      */
-    public static function calcResult(
+    public static function calcFractionalPayment(
         float $afterdeduct,
         float $taxbaseRetenciones,
         float $positivosTrimestres
     ): float {
-        return max(
-            0.0,
-            round(
-                $afterdeduct
-                - $taxbaseRetenciones
-                - $positivosTrimestres,
-                2
-            )
+        return round(
+            $afterdeduct
+            - $taxbaseRetenciones
+            - $positivosTrimestres,
+            2
         );
+    }
+
+     /**
+     * Calcula el resultado final del modelo (casilla 19) en base al pago fraccionado previo.
+     * Si el resultado es negativo, el resultado final no puede ser negativo.
+     */
+    public static function calcResult(float $fractionalPayment): float
+    {
+        return max(0.0, $fractionalPayment);
     }
 
     protected static function getSqlValueCondition(
@@ -836,11 +843,13 @@ class Modelo130
             $todeduct
         );
 
-        $result = static::calcResult(
+        $fractionalPayment = static::calcFractionalPayment(
             $afterdeduct,
             static::$taxbaseRetentions,
             static::$previousPayments
         );
+
+        $result = static::calcResult($fractionalPayment);
 
         return [
             'taxbaseIngresos' => static::$taxbaseIncomes,
@@ -850,6 +859,7 @@ class Modelo130
             'gastosJustificacion' => $gastosJustificacion,
             'afterdeduct' => $afterdeduct,
             'positivosTrimestres' => static::$previousPayments,
+            'fractionalPayment' => $fractionalPayment,
             'result' => $result,
         ];
     }

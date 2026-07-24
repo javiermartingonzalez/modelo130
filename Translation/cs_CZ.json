@@ -4,6 +4,7 @@
     "after-deduct": "sobre casilla 04",
     "deductible-subaccounts": "Odečitatelné účty",
     "exists-accounting-130": "V účetním období %codejercicio% již existuje účetní zápis s popisem: %concepto%",
+    "fractional-payment": "Zálohová platba za předchozí čtvrtletí",
     "gastos-justificacion": "Výdaje obtížně ospravedlnitelné",
     "gastos-justificacion-limit": "Pozor: částka překračuje roční limit 2 000 €",
     "gastos-justificacion-pct": "% Výdaje obtížně ospravedlnitelné",
@@ -17,5 +18,5 @@
     "previous-model": "Ingresos trimestres anteriores",
     "tax-expenses": "Gastos deducibles",
     "tax-incomes": "Ingresos computables",
-    "tax-negative-info": "Si da pérdidas (negativo) = 0"
+    "tax-negative-info": "Pokud je 07 záporné (ztráta) = 0"
 }

@@ -11,6 +11,7 @@
     "download-aeat-file": "Download AEAT file",
     "exists-accounting-130": "An accounting entry already exists in fiscal year %codejercicio% with the concept: %concepto%",
     "expense": "Deductible expense",
+    "fractional-payment": "Previous-quarter instalment payment",
     "gastos-justificacion": "Difficult-to-justify expenses",
     "gastos-justificacion-limit": "Warning: the amount exceeds the annual limit of €2,000",
     "gastos-justificacion-pct": "% Hard-to-justify expenses",
@@ -26,5 +27,5 @@
     "previous-payment": "Previous payment",
     "tax-expenses": "Deductible expenses",
     "tax-incomes": "Computable income",
-    "tax-negative-info": "If it gives losses (negative) = 0"
+    "tax-negative-info": "If 07 is a loss (negative) = 0"
 }

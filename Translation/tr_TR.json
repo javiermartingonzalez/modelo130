@@ -4,6 +4,7 @@
     "after-deduct": "04 numaralı kutu hakkında",
     "deductible-subaccounts": "İndirilebilir alt hesaplar",
     "exists-accounting-130": "%codejercicio% döneminde %concepto% açıklamalı bir kayıt zaten mevcut.",
+    "fractional-payment": "Önceki çeyrek taksit ödemesi",
     "gastos-justificacion": "Gerekçelendirilmesi zor giderler",
     "gastos-justificacion-limit": "Dikkat: tutar yıllık 2.000 € limitini aşıyor",
     "gastos-justificacion-pct": "% Gerekçelendirilmesi zor giderler",
@@ -17,5 +18,5 @@
     "previous-model": "Önceki çeyrek gelirleri",
     "tax-expenses": "Düşürülebilir Harcamalar",
     "tax-incomes": "Gelir hesaplamaları",
-    "tax-negative-info": "Zarar veriyorsa (negatif) = 0"
+    "tax-negative-info": "07 zarar verirse (negatif) = 0"
 }

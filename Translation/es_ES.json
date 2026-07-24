@@ -11,6 +11,7 @@
     "download-aeat-file": "Descargar fichero AEAT",
     "exists-accounting-130": "Ya existe un asiento en el ejercicio %codejercicio% con el concepto: %concepto%",
     "expense": "Gasto deducible",
+    "fractional-payment": "Pago fraccionado previo trimestre",
     "gastos-justificacion": "Gastos de difícil justificación",
     "gastos-justificacion-limit": "Atención: el importe supera el límite anual de 2.000 €",
     "gastos-justificacion-pct": "% Gastos de difícil justificación",
@@ -26,5 +27,5 @@
     "previous-payment": "Pago fraccionado anterior",
     "tax-expenses": "Gastos deducibles",
     "tax-incomes": "Ingresos computables",
-    "tax-negative-info": "Si da pérdidas (negativo) = 0"
+    "tax-negative-info": "Si 07 da pérdidas (negativo) = 0"
 }
