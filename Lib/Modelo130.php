@@ -317,16 +317,16 @@ class Modelo130
     protected static function loadAccountingData(): void
     {
         $conditions = [];
-
+    
         foreach (Modelo130Accounts::queryPrefixes() as $prefix) {
             $conditions[] = 'p.codsubcuenta LIKE '
                 . static::$dataBase->var2str($prefix . '%');
         }
-
+    
         if (empty($conditions)) {
             return;
         }
-
+    
         $sql = 'SELECT p.*'
             . ' FROM ' . Partida::tableName() . ' p'
             . ' INNER JOIN ' . Asiento::tableName() . ' a'
@@ -350,7 +350,7 @@ class Modelo130
             )
             . ' AND (' . implode(' OR ', $conditions) . ')'
             . ' ORDER BY a.fecha ASC, a.numero ASC, p.orden ASC';
-
+    
         /**
          * Agrupamos las partidas por asiento.
          *
@@ -358,11 +358,36 @@ class Modelo130
          * aparece una única vez en la pestaña correspondiente.
          */
         $groups = [];
-
+    
+        /**
+         * Las cuentas 61 y 71 no pueden clasificarse hasta conocer su saldo
+         * acumulado completo:
+         *
+         * - saldo deudor: gasto;
+         * - saldo acreedor: ingreso.
+         */
+        $stockVariationBalances = [
+            '61' => 0.0,
+            '71' => 0.0,
+        ];
+    
+        /**
+         * Posiciones de las partidas 61 y 71 pendientes de clasificación.
+         *
+         * Solo estas partidas se recorren de nuevo al terminar la consulta.
+         *
+         * @var array<int, array{
+         *     idasiento: int,
+         *     entryIndex: int,
+         *     prefix: string
+         * }>
+         */
+        $pendingStockVariations = [];
+    
         foreach (static::$dataBase->select($sql) as $row) {
             $partida = new Partida($row);
             $idasiento = (int)$partida->idasiento;
-
+    
             if (!isset($groups[$idasiento])) {
                 $groups[$idasiento] = [
                     'entries' => [],
@@ -371,36 +396,47 @@ class Modelo130
                     'retention' => 0.0,
                 ];
             }
-
-            $code = (string)$partida->codsubcuenta;
-
-            /**
-             * En ingresos sumamos haber - debe.
-             *
-             * Así una rectificación o un asiento inverso reduce el ingreso
-             * computable en lugar de incrementarlo.
-             */
-            $income = Modelo130Accounts::isIncome($code)
-                ? round(
-                    (float)$partida->haber
-                    - (float)$partida->debe,
-                    2
-                )
-                : 0.0;
-
-            /**
-             * En gastos sumamos debe - haber.
-             *
-             * Así una devolución o regularización inversa reduce el gasto.
-             */
-            $expense = Modelo130Accounts::isExpense($code)
-                ? round(
-                    (float)$partida->debe
-                    - (float)$partida->haber,
-                    2
-                )
-                : 0.0;
-
+    
+            $code = trim((string)$partida->codsubcuenta);
+            $debit = (float)$partida->debe;
+            $credit = (float)$partida->haber;
+    
+            $income = 0.0;
+            $expense = 0.0;
+    
+            $isStockVariation = Modelo130Accounts::isStockVariation($code);
+    
+            if ($isStockVariation) {
+                /**
+                 * Acumulamos el saldo, pero aplazamos la clasificación hasta
+                 * haber leído todas las partidas del período.
+                 */
+                $prefix = substr($code, 0, 2);
+    
+                if (isset($stockVariationBalances[$prefix])) {
+                    $stockVariationBalances[$prefix] += $debit - $credit;
+                }
+            } else {
+                /**
+                 * En ingresos sumamos haber - debe.
+                 *
+                 * Así una rectificación o un asiento inverso reduce el ingreso
+                 * computable en lugar de incrementarlo.
+                 */
+                if (Modelo130Accounts::isIncome($code)) {
+                    $income = round($credit - $debit, 2);
+                }
+    
+                /**
+                 * En gastos sumamos debe - haber.
+                 *
+                 * Así una devolución o regularización inversa reduce el gasto.
+                 */
+                if (Modelo130Accounts::isExpense($code)) {
+                    $expense = round($debit - $credit, 2);
+                }
+            }
+    
             /**
              * En la cuenta 473 el movimiento habitual está en el debe.
              *
@@ -409,71 +445,129 @@ class Modelo130
              * el asiento está asociado a una factura de cliente.
              */
             $retention = Modelo130Accounts::isWithholding($code)
-                ? round(
-                    (float)$partida->debe
-                    - (float)$partida->haber,
-                    2
-                )
+                ? round($debit - $credit, 2)
                 : 0.0;
-
+    
             $groups[$idasiento]['income'] += $income;
             $groups[$idasiento]['expense'] += $expense;
             $groups[$idasiento]['retention'] += $retention;
-
+    
+            $entryIndex = count($groups[$idasiento]['entries']);
+    
             $groups[$idasiento]['entries'][] = [
                 'partida' => $partida,
                 'income' => $income,
                 'expense' => $expense,
                 'retention' => $retention,
             ];
+    
+            if ($isStockVariation) {
+                $prefix = substr($code, 0, 2);
+    
+                if (isset($stockVariationBalances[$prefix])) {
+                    $pendingStockVariations[] = [
+                        'idasiento' => $idasiento,
+                        'entryIndex' => $entryIndex,
+                        'prefix' => $prefix,
+                    ];
+                }
+            }
         }
-
+    
+        /**
+         * Clasificamos únicamente las partidas 61 y 71 pendientes.
+         */
+        foreach ($pendingStockVariations as $pending) {
+            $idasiento = $pending['idasiento'];
+            $entryIndex = $pending['entryIndex'];
+            $prefix = $pending['prefix'];
+    
+            $balance = round(
+                $stockVariationBalances[$prefix] ?? 0.0,
+                2
+            );
+    
+            if ($balance == 0.0) {
+                continue;
+            }
+    
+            $partida = $groups[$idasiento]['entries'][$entryIndex]['partida'];
+            $debit = (float)$partida->debe;
+            $credit = (float)$partida->haber;
+    
+            $income = 0.0;
+            $expense = 0.0;
+    
+            if ($balance > 0.0) {
+                /**
+                 * Saldo deudor: gasto.
+                 *
+                 * Las partidas acreedoras producen importes negativos y
+                 * reducen correctamente el gasto acumulado.
+                 */
+                $expense = round($debit - $credit, 2);
+            } else {
+                /**
+                 * Saldo acreedor: ingreso.
+                 *
+                 * Las partidas deudoras producen importes negativos y
+                 * reducen correctamente el ingreso acumulado.
+                 */
+                $income = round($credit - $debit, 2);
+            }
+    
+            $groups[$idasiento]['income'] += $income;
+            $groups[$idasiento]['expense'] += $expense;
+    
+            $groups[$idasiento]['entries'][$entryIndex]['income'] = $income;
+            $groups[$idasiento]['entries'][$entryIndex]['expense'] = $expense;
+        }
+    
         if (empty($groups)) {
             return;
         }
-
+    
         $entryIds = array_keys($groups);
-
+    
         /**
          * Cargamos en bloque los asientos y las facturas relacionadas para no
          * ejecutar una consulta adicional por cada partida.
          */
         $accountingEntries = static::loadEntriesByIds($entryIds);
-
+    
         $customerInvoices = static::loadInvoicesByEntries(
             new FacturaCliente(),
             $entryIds
         );
-
+    
         $supplierInvoices = static::loadInvoicesByEntries(
             new FacturaProveedor(),
             $entryIds
         );
-
+    
         foreach ($groups as $idasiento => $group) {
             $entry = $accountingEntries[$idasiento] ?? null;
-
+    
             if (null === $entry) {
                 continue;
             }
-
+    
             $customerInvoice = $customerInvoices[$idasiento] ?? null;
             $supplierInvoice = $supplierInvoices[$idasiento] ?? null;
-
+    
             static::$taxbaseIncomes += $group['income'];
             static::$taxbaseExpenses += $group['expense'];
-
+    
             /**
              * Factura de cliente.
              *
              * El ingreso y el IRPF se obtienen desde las partidas contables,
              * pero se muestran agrupados utilizando los datos identificativos
              * de la factura.
-             *
              */
             if ($customerInvoice) {
                 static::$taxbaseRetentions += $group['retention'];
-
+    
                 if (
                     $group['income'] != 0.0
                     || $group['retention'] != 0.0
@@ -496,10 +590,10 @@ class Modelo130
                         ),
                     ];
                 }
-
+    
                 continue;
             }
-
+    
             /**
              * Factura de proveedor.
              *
@@ -527,10 +621,10 @@ class Modelo130
                         'irpf' => 0.0,
                     ];
                 }
-
+    
                 continue;
             }
-
+    
             /**
              * El asiento no está asociado a ninguna factura.
              *
@@ -540,12 +634,13 @@ class Modelo130
              * - Seguridad Social;
              * - gastos manuales;
              * - ingresos manuales;
+             * - variaciones de existencias;
              * - pagos fraccionados de trimestres anteriores.
              */
             foreach ($group['entries'] as $item) {
                 $type = '';
                 $amount = 0.0;
-
+    
                 if ($item['income'] != 0.0) {
                     $type = 'income';
                     $amount = $item['income'];
@@ -564,14 +659,14 @@ class Modelo130
                      */
                     $type = 'previous-payment';
                     $amount = $item['retention'];
-                
+    
                     static::$previousPayments += $amount;
                 }
-
+    
                 if ($type === '') {
                     continue;
                 }
-
+    
                 static::$accountingEntries[] = [
                     'entry' => $entry,
                     'partida' => $item['partida'],
@@ -580,22 +675,22 @@ class Modelo130
                 ];
             }
         }
-
+    
         static::$taxbaseIncomes = round(
             static::$taxbaseIncomes,
             2
         );
-
+    
         static::$taxbaseExpenses = round(
             static::$taxbaseExpenses,
             2
         );
-
+    
         static::$taxbaseRetentions = round(
             static::$taxbaseRetentions,
             2
         );
-
+    
         static::$previousPayments = round(
             static::$previousPayments,
             2
