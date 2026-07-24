@@ -170,29 +170,29 @@ final class Modelo130Test extends TestCase
     public function testCalcGastosJustificacion(): void
     {
         // desactivado: siempre 0 aunque haya base
-        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(10000.0, false, 7.0));
+        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(10000.0, false, 5.0));
 
         // base cero o negativa: 0
-        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(0.0, true, 7.0));
-        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(-500.0, true, 7.0));
+        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(0.0, true, 5.0));
+        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(-500.0, true, 5.0));
 
         // porcentaje por defecto (7%) sobre una base por debajo del límite
-        $this->assertSame(700.0, Modelo130::calcGastosJustificacion(10000.0, true, 7.0));
-
-        // el 5% anterior sigue siendo posible de forma explícita
         $this->assertSame(500.0, Modelo130::calcGastosJustificacion(10000.0, true, 5.0));
 
+        // el 5% anterior sigue siendo posible de forma explícita
+        $this->assertSame(700.0, Modelo130::calcGastosJustificacion(10000.0, true, 7.0));
+
         // redondeo a 2 decimales
-        $this->assertSame(70.35, Modelo130::calcGastosJustificacion(1005.0, true, 7.0));
+        $this->assertSame(50.25, Modelo130::calcGastosJustificacion(1005.0, true, 5.0));
 
         // tope anual de 2.000 €: 7% de 40.000 = 2.800, pero se limita a 2.000
-        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(40000.0, true, 7.0));
+        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(40000.0, true, 5.0));
 
         // muy por encima del tope: se limita igualmente a 2.000
-        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(100000.0, true, 7.0));
+        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(100000.0, true, 5.0));
 
         // justo por debajo del límite (7% de 28.500 = 1.995): no se topa
-        $this->assertSame(1995.0, Modelo130::calcGastosJustificacion(28500.0, true, 7.0));
+        $this->assertSame(1995.0, Modelo130::calcGastosJustificacion(39900.0, true, 5.0));
 
         // la constante del límite es la esperada
         $this->assertSame(2000.0, Modelo130::LIMITE_GASTOS_JUSTIFICACION);
@@ -215,7 +215,7 @@ final class Modelo130Test extends TestCase
         $this->assertSame(0.0, Modelo130::calcAfterDeduct(0.0, 0.0, 20.0));
 
         // con gastos de difícil justificación descontados
-        $this->assertSame(1860.0, Modelo130::calcAfterDeduct(10000.0, 700.0, 20.0));
+        $this->assertSame(1900.0, Modelo130::calcAfterDeduct(10000.0, 500.0, 20.0));
     }
 
     /**

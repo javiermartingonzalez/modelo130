@@ -107,7 +107,7 @@ class Modelo130
         string $period,
         bool $applyGastosJustificacion = false,
         float $todeduct = 20.0,
-        float $gastosJustificacionPct = 7.0
+        float $gastosJustificacionPct = 5.0
     ): array {
         static::$exercise = new Ejercicio();
         if (false === static::$exercise->load($codejercicio)) {
@@ -231,7 +231,7 @@ class Modelo130
     public static function calcGastosJustificacion(
         float $taxbase,
         bool $apply,
-        float $gastosJustificacionPct = 7.0
+        float $gastosJustificacionPct = 5.0
     ): float {
         if (false === $apply || $taxbase <= 0) {
             return 0.0;
@@ -816,7 +816,7 @@ class Modelo130
     protected static function loadResults(
         bool $applyGastosJustificacion,
         float $todeduct,
-        float $gastosJustificacionPct = 7.0
+        float $gastosJustificacionPct = 5.0
     ): array {
         $taxbase = round(
             static::$taxbaseIncomes

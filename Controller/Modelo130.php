@@ -43,7 +43,7 @@ class Modelo130 extends Controller
     public $applyGastosJustificacion = false;
 
     /** @var float */
-    public $gastosJustificacionPct = 7.0;
+    public $gastosJustificacionPct = 5.0;
 
     /** @var string */
     public $codejercicio;
@@ -133,7 +133,7 @@ class Modelo130 extends Controller
         $this->todeduct = (float)$this->request->request->get('todeduct', 20.0);
         $this->gastosJustificacionPct = (float)$this->request->request->get(
             'gastosJustificacionPct',
-            7.0
+            5.0
         );
 
         $this->result = DinModelo130::generate(
