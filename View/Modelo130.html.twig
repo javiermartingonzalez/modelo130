@@ -202,7 +202,7 @@
                         <p class="form-text text-muted">{{ trans('tax-negative-info') }}</p>
                     </div>
                 </div>
-                {% if fsc.result.result > 0 %}
+                {% if fsc.result.result > 0 and not fsc.result.currentPaymentEntryExists %}
                     <div class="col d-flex justify-content-end align-items-center">
                         <button type="button" class="btn btn-success mt-2 float-start float-sm-right" data-bs-toggle="modal" data-bs-target="#createAccountingModal">
                             <i class="fa-solid fa-scale-balanced"></i>

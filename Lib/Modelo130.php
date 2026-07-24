@@ -102,6 +102,9 @@ class Modelo130
     /** @var float */
     protected static $previousPayments = 0.0;
 
+    /** @var bool */
+    protected static $currentPaymentEntryExists = false;
+
     public static function generate(
         string $codejercicio,
         string $period,
@@ -125,6 +128,7 @@ class Modelo130
         static::$taxbaseIncomes = 0.0;
         static::$taxbaseRetentions = 0.0;
         static::$previousPayments = 0.0;
+        static::$currentPaymentEntryExists = false;
 
         static::loadDates();
         static::loadAccountingData();
@@ -142,6 +146,7 @@ class Modelo130
             'sales' => static::$sales,
             'purchases' => static::$purchases,
             'accountingEntries' => static::$accountingEntries,
+            'currentPaymentEntryExists' => static::$currentPaymentEntryExists,
             'applyGastosJustificacion' => $applyGastosJustificacion,
             'todeduct' => $todeduct,
             'gastosJustificacionPct' => $gastosJustificacionPct,
@@ -551,12 +556,22 @@ class Modelo130
             new FacturaProveedor(),
             $entryIds
         );
+
+        $currentPaymentConcept = Tools::trans(
+            'acc-concept-irpf-130',
+            ['%period%' => static::$period]
+        );
     
         foreach ($groups as $idasiento => $group) {
             $entry = $accountingEntries[$idasiento] ?? null;
     
             if (null === $entry) {
                 continue;
+            }
+
+            $isCurrentPaymentEntry = $entry->concepto === $currentPaymentConcept;
+            if ($isCurrentPaymentEntry) {
+                static::$currentPaymentEntryExists = true;
             }
     
             $customerInvoice = $customerInvoices[$idasiento] ?? null;
@@ -659,11 +674,13 @@ class Modelo130
                      * Toda partida de la cuenta 473 sin factura asociada se considera
                      * un pago fraccionado del Modelo 130.
                      *
-                     * También se incluye el pago correspondiente al propio trimestre.
-                     * El asiento se genera con fecha del último día del período, por lo
-                     * que al volver a calcular el modelo ese importe aparece en la
-                     * casilla 05 y evita crear el mismo pago de nuevo.
+                     * El pago correspondiente al propio trimestre se detecta, pero no
+                     * se incluye en la casilla 05 para garantizar la idempotencia.
                      */
+                    if ($isCurrentPaymentEntry) {
+                        continue;
+                    }
+
                     $type = 'previous-payment';
                     $amount = $item['retention'];
     
