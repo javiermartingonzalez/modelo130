@@ -30,7 +30,7 @@
     "model-130-overlapping-prefix": "Účet je již zahrnut jiným pravidlem nebo zahrnuje existující pravidlo.",
     "model-130-p": "El Modelo 130 es una declaración trimestral del impuesto de la renta de las personas físicas (IRPF) en el que se liquida el pago fraccionado de este impuesto, a cuenta de la declaración anual que se realiza el año siguiente.",
     "model-130-prefix-help": "Kódy jsou interpretovány jako prefixy. Například 62 zahrnuje všechny podúčty začínající číslem 62. Účet 473 je vždy zpracován interně a v těchto seznamech se nezobrazuje.",
-    "model-130-prefix-includes": "Prefix %code% má v účtovém plánu podřízené účty",
+    "model-130-prefix-includes": "Prefix %code% s podřízenými účty v účtovém plánu",
     "model-130-prefix-not-found": "Prefix %code% nemá v aktuálním účtovém plánu přesný účet",
     "model-130-r": "Datos acumulados del período comprendido entre el primer día del año y el último día del trimestre seleccionado.",
     "model-130-restore-confirm": "Aktuální nastavení bude odstraněno a znovu vytvořeno z nainstalovaného účtového plánu. Pokračovat?",

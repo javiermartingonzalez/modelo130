@@ -30,7 +30,7 @@
     "model-130-overlapping-prefix": "The account is already included by another rule or includes an existing rule.",
     "model-130-p": "Model 130 is a quarterly declaration of personal income tax (IRPF) in which the installment payment of this tax is settled, on account of the annual declaration that is made the following year.",
     "model-130-prefix-help": "Codes are interpreted as prefixes. For example, 62 includes all subaccounts beginning with 62. Account 473 is always processed internally and does not appear in these lists.",
-    "model-130-prefix-includes": "Prefix %code% with descendant accounts in the chart of accounts",
+    "model-130-prefix-includes": "Prefix %code% with child accounts in the chart of accounts",
     "model-130-prefix-not-found": "Prefix %code% without an exact account in the current chart of accounts",
     "model-130-r": "Accumulated data for the period between the first day of the year and the last day of the selected quarter.",
     "model-130-restore-confirm": "The current configuration will be deleted and rebuilt from the installed chart of accounts. Continue?",

@@ -30,7 +30,7 @@
     "model-130-overlapping-prefix": "A conta já está incluída por outra regra ou abrange uma regra existente.",
     "model-130-p": "O Modelo 130 é uma declaração trimestral do imposto sobre a renda das pessoas físicas (IRPF) na qual se liquida o pagamento fracionado deste imposto, a título da declaração anual que é realizada no ano seguinte.",
     "model-130-prefix-help": "Os códigos são interpretados como prefixos. Por exemplo, 62 inclui todas as subcontas que começam por 62. A conta 473 é sempre processada internamente e não aparece nestas listas.",
-    "model-130-prefix-includes": "Prefixo %code% com contas descendentes no plano de contas",
+    "model-130-prefix-includes": "Prefixo %code% com contas filhas no plano de contas",
     "model-130-prefix-not-found": "Prefixo %code% sem uma conta exata no plano de contas atual",
     "model-130-r": "Dados acumulados para o período entre o primeiro dia do ano e o último dia do trimestre selecionado.",
     "model-130-restore-confirm": "A configuração atual será excluída e reconstruída a partir do plano de contas instalado. Continuar?",

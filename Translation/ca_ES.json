@@ -30,7 +30,7 @@
     "model-130-overlapping-prefix": "El compte ja està inclòs per una altra regla o engloba una regla existent.",
     "model-130-p": "El Model 130 és una declaració trimestral de l'impost de la renda de les persones físiques (IRPF) en el qual es liquida el pagament fraccionat d'aquest impost, a compte de la declaració anual que es realitza l'any següent.",
     "model-130-prefix-help": "Els codis s’interpreten com a prefixos. Per exemple, 62 inclou tots els subcomptes que comencen per 62. El compte 473 es processa sempre internament i no apareix en aquestes llistes.",
-    "model-130-prefix-includes": "Prefix %code% amb comptes descendents al pla comptable",
+    "model-130-prefix-includes": "Prefix %code% amb comptes fills al pla comptable",
     "model-130-prefix-not-found": "Prefix %code% sense un compte exacte al pla comptable actual",
     "model-130-r": "Dades acumulades del període comprès entre el primer dia de l'any i el darrer dia del trimestre seleccionat.",
     "model-130-restore-confirm": "Se suprimirà la configuració actual i es reconstruirà a partir del pla comptable instal·lat. Voleu continuar?",

@@ -30,7 +30,7 @@
     "model-130-overlapping-prefix": "Le compte est déjà inclus par une autre règle ou englobe une règle existante.",
     "model-130-p": "Le formulaire 130 est une déclaration trimestrielle de l'impôt sur le revenu des personnes physiques (IRPF) dans laquelle le paiement de cet impôt est réglé par acomptes, compte tenu de la déclaration annuelle à effectuer l'année suivante.",
     "model-130-prefix-help": "Les codes sont interprétés comme des préfixes. Par exemple, 62 inclut tous les sous-comptes commençant par 62. Le compte 473 est toujours traité en interne et n'apparaît pas dans ces listes.",
-    "model-130-prefix-includes": "Préfixe %code% avec des comptes descendants dans le plan comptable",
+    "model-130-prefix-includes": "Préfixe %code% avec des comptes enfants dans le plan comptable",
     "model-130-prefix-not-found": "Préfixe %code% sans compte exact dans le plan comptable actuel",
     "model-130-r": "Données cumulées pour la période comprise entre le premier jour de l'année et le dernier jour du trimestre sélectionné.",
     "model-130-restore-confirm": "La configuration actuelle sera supprimée et reconstruite à partir du plan comptable installé. Continuer ?",

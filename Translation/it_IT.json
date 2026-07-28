@@ -30,7 +30,7 @@
     "model-130-overlapping-prefix": "Il conto è già incluso da un’altra regola o comprende una regola esistente.",
     "model-130-p": "Il Modello 130 è una dichiarazione trimestrale dell'imposta sul reddito delle persone fisiche (IRPF) in cui si liquida il pagamento rateale di questa imposta, a titolo di acconto della dichiarazione annuale che verrà effettuata l'anno successivo",
     "model-130-prefix-help": "I codici vengono interpretati come prefissi. Ad esempio, 62 include tutti i sottoconti che iniziano con 62. Il conto 473 viene sempre elaborato internamente e non compare in questi elenchi.",
-    "model-130-prefix-includes": "Prefisso %code% con conti discendenti nel piano dei conti",
+    "model-130-prefix-includes": "Prefisso %code% con conti figli nel piano dei conti",
     "model-130-prefix-not-found": "Prefisso %code% senza un conto esatto nel piano dei conti corrente",
     "model-130-r": "Dati accumulati per il periodo compreso tra il primo giorno dell'anno e l'ultimo giorno del trimestre selezionato.",
     "model-130-restore-confirm": "La configurazione attuale verrà eliminata e ricostruita dal piano dei conti installato. Continuare?",
