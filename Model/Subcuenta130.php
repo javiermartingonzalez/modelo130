@@ -27,6 +27,9 @@ use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Subcuenta;
 use FacturaScripts\Dinamic\Model\User;
 
+/**
+ * Relación entre una subcuenta contable y su tipo para el modelo 130
+ */
 class Subcuenta130 extends ModelClass
 {
     use ModelTrait;
