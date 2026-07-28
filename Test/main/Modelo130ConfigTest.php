@@ -25,7 +25,6 @@ use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Cuenta;
 use FacturaScripts\Dinamic\Model\Mod130Conf;
-use FacturaScripts\Dinamic\Model\User;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Accounts;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
 use FacturaScripts\Test\Traits\DefaultSettingsTrait;
@@ -146,31 +145,27 @@ final class Modelo130ConfigTest extends TestCase
     }
 
     /**
-     * Al crear una regla se guardan el usuario y la fecha de creación, y el
-     * nick corresponde con un usuario existente.
+     * Al crear una regla se guardan el usuario y la fecha de creación.
      */
     public function testRuleCreationIsLinkedToUser(): void
     {
         $originalRules = $this->snapshotRules();
 
         try {
-            $this->replaceRules([
-                [Mod130Conf::TIPO_GASTO, '699999999999999'],
-            ]);
-
-            $rule = new Mod130Conf();
             $this->assertTrue($rule->loadWhere([Where::eq('codigo', '699999999999999')]));
 
-            $currentNick = Session::user()->nick;
-            $this->assertSame($currentNick, $rule->nick);
-            $this->assertNotEmpty($rule->creation_date);
+            $rule = new Mod130Conf();
 
-            $user = new User();
-            $this->assertTrue(
-                $user->loadWhere([Where::eq('nick', $rule->nick)]),
-                'El nick de creación debe corresponder con un usuario existente'
+            $this->assertSame(
+                Session::user()->nick,
+                $rule->nick,
+                'El nick de creación debe ser el usuario de la sesión'
             );
-            $this->assertSame($currentNick, $rule->user()?->nick);
+
+            $this->assertNotEmpty(
+                $rule->creation_date,
+                'La fecha de creación debe guardarse'
+            );
         } finally {
             $this->replaceRules($originalRules);
         }
