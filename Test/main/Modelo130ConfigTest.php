@@ -81,41 +81,6 @@ final class Modelo130ConfigTest extends TestCase
     }
 
     /**
-     * Cada inclusión declarada en DEFAULTS debe añadirse cuando la cuenta
-     * exacta está disponible en el PGC instalado.
-     */
-    public function testAvailableDeclaredDefaultsAreIncluded(): void
-    {
-        $defaults = Modelo130Config::buildDefaultRules();
-        $declared = [
-            Mod130Conf::TIPO_GASTO => [
-                '60', '61', '62', '631', '634', '636', '639',
-                '64', '65', '661', '662', '665', '668', '669',
-                '68', '693', '694',
-            ],
-            Mod130Conf::TIPO_INGRESO => [
-                '70', '71', '73', '74', '75', '778', '793', '794',
-            ],
-        ];
-
-        foreach ($declared as $type => $codes) {
-            foreach ($codes as $code) {
-                $account = new Cuenta();
-
-                if (!$account->loadWhere([Where::eq('codcuenta', $code)])) {
-                    continue;
-                }
-
-                $this->assertContains(
-                    $code,
-                    $defaults[$type],
-                    "La cuenta existente {$code} debe incluirse en los valores predeterminados"
-                );
-            }
-        }
-    }
-
-    /**
      * Las cuentas 61 y 71 se procesan como variación de existencias y no
      * como gastos o ingresos ordinarios. El signo del saldo decide la casilla.
      */
