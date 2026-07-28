@@ -74,6 +74,8 @@ final class Modelo130Test extends TestCase
             'sales',
             'purchases',
             'accountingEntries',
+            'currentPaymentEntry',
+            'currentPaymentEntryExists',
             'applyGastosJustificacion',
             'todeduct',
             'gastosJustificacionPct',
@@ -128,7 +130,8 @@ final class Modelo130Test extends TestCase
 
         $periodo = 'T1';
         $importe = 100.0;
-        $fecha = date('Y-m-d');
+        $year = date('Y', strtotime($ejercicio->fechainicio));
+        $fecha = $year . '-03-31';
 
         // la primera llamada debe crear el asiento correctamente
         $creado = Modelo130::generateEntries($idempresa, $codejercicio, $periodo, $fecha, $importe, $paymentMethodId);
@@ -155,6 +158,17 @@ final class Modelo130Test extends TestCase
         $this->assertEquals($importe, $partidas[0]->debe);
         $this->assertEquals(0.0, (float)$partidas[0]->haber);
         $this->assertEquals($importe, $partidas[1]->haber);
+
+        // generate() debe devolver el propio asiento para que la interfaz
+        // pueda mostrar un enlace directo cuando ya existe.
+        $resultado = Modelo130::generate($codejercicio, $periodo);
+        $this->assertTrue($resultado['currentPaymentEntryExists']);
+        $this->assertInstanceOf(Asiento::class, $resultado['currentPaymentEntry']);
+        $this->assertSame(
+            (int) $asiento->idasiento,
+            (int) $resultado['currentPaymentEntry']->idasiento
+        );
+        $this->assertNotEmpty($resultado['currentPaymentEntry']->url());
 
         // una segunda llamada con los mismos parámetros debe devolver false (ya existe)
         $duplicado = Modelo130::generateEntries($idempresa, $codejercicio, $periodo, $fecha, $importe, $paymentMethodId);

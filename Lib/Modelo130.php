@@ -102,8 +102,8 @@ class Modelo130
     /** @var float */
     protected static $previousPayments = 0.0;
 
-    /** @var bool */
-    protected static $currentPaymentEntryExists = false;
+    /** @var Asiento|null */
+    protected static $currentPaymentEntry;
 
     public static function generate(
         string $codejercicio,
@@ -128,7 +128,7 @@ class Modelo130
         static::$taxbaseIncomes = 0.0;
         static::$taxbaseRetentions = 0.0;
         static::$previousPayments = 0.0;
-        static::$currentPaymentEntryExists = false;
+        static::$currentPaymentEntry = null;
 
         static::loadDates();
         static::loadAccountingData();
@@ -146,7 +146,8 @@ class Modelo130
             'sales' => static::$sales,
             'purchases' => static::$purchases,
             'accountingEntries' => static::$accountingEntries,
-            'currentPaymentEntryExists' => static::$currentPaymentEntryExists,
+            'currentPaymentEntry' => static::$currentPaymentEntry,
+            'currentPaymentEntryExists' => null !== static::$currentPaymentEntry,
             'applyGastosJustificacion' => $applyGastosJustificacion,
             'todeduct' => $todeduct,
             'gastosJustificacionPct' => $gastosJustificacionPct,
@@ -571,7 +572,7 @@ class Modelo130
 
             $isCurrentPaymentEntry = $entry->concepto === $currentPaymentConcept;
             if ($isCurrentPaymentEntry) {
-                static::$currentPaymentEntryExists = true;
+                static::$currentPaymentEntry = $entry;
             }
     
             $customerInvoice = $customerInvoices[$idasiento] ?? null;

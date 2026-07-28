@@ -47,126 +47,18 @@ final class Modelo130Accounts
      */
     public const WITHHOLDING_ACCOUNT = '473';
 
-    /**
-     * Cuentas de gastos computables.
-     *
-     * Las variaciones de existencias 61 y 71 se tratan por separado porque
-     * su clasificación depende del saldo deudor o acreedor acumulado.
-     *
-     * @return array<string, string>
-     */
+    /** @return string[] */
     public static function expenses(): array
     {
-        return [
-            '60' => 'Compras',
-            '62' => 'Servicios exteriores',
-            '63' => 'Tributos',
-            '64' => 'Gastos de personal',
-            '65' => 'Otros gastos de gestión',
-            '66' => 'Gastos financieros',
-            '67' => 'Pérdidas procedentes de activos no corrientes y gastos excepcionales',
-            '68' => 'Dotaciones para amortizaciones',
-            '69' => 'Pérdidas por deterioro y otras dotaciones',
-        ];
+        Modelo130Config::ensureDefaults();
+        return Modelo130Config::prefixes(\FacturaScripts\Dinamic\Model\Mod130Conf::TIPO_GASTO);
     }
 
-    /**
-     * Cuentas excluidas aunque pertenezcan a un subgrupo de gastos.
-     *
-     * Se excluyen:
-     *
-     * - el impuesto sobre beneficios y sus ajustes;
-     * - resultados de instrumentos financieros y créditos no comerciales;
-     * - pérdidas derivadas de activos no corrientes;
-     * - gastos excepcionales, por ser una cuenta mixta utilizada habitualmente
-     *   para sanciones, recargos y otros conceptos no deducibles;
-     * - deterioros fiscalmente no deducibles;
-     * - provisiones calculadas posteriormente por el módulo fiscal.
-     *
-     * @return array<string, string>
-     */
-    public static function excludedExpenses(): array
-    {
-        return [
-            '630' => 'Impuesto sobre beneficios',
-            '633' => 'Ajustes negativos en la imposición sobre beneficios',
-            '638' => 'Ajustes positivos en la imposición sobre beneficios',
-
-            '660' => 'Actualización financiera de provisiones calculadas fuera de esta clase',
-            '663' => 'Pérdidas por valoración de instrumentos financieros',
-            '664' => 'Dividendos de instrumentos considerados pasivos financieros',
-            '666' => 'Pérdidas en participaciones y valores representativos de deuda',
-            '667' => 'Pérdidas de créditos no comerciales',
-
-            '670' => 'Pérdidas procedentes del inmovilizado intangible',
-            '671' => 'Pérdidas procedentes del inmovilizado material',
-            '672' => 'Pérdidas procedentes de inversiones inmobiliarias',
-            '673' => 'Pérdidas procedentes de participaciones a largo plazo',
-            '675' => 'Pérdidas por operaciones con obligaciones propias',
-            '678' => 'Gastos excepcionales excluidos por defecto',
-
-            '690' => 'Deterioro del inmovilizado intangible',
-            '691' => 'Deterioro del inmovilizado material',
-            '692' => 'Deterioro de inversiones inmobiliarias',
-            '695' => 'Provisiones calculadas posteriormente por el módulo fiscal',
-            '696' => 'Deterioro de participaciones y valores a largo plazo',
-            '697' => 'Deterioro de créditos no comerciales a largo plazo',
-            '698' => 'Deterioro de participaciones y valores a corto plazo',
-            '699' => 'Deterioro de créditos no comerciales a corto plazo',
-        ];
-    }
-
-    /**
-     * Cuentas de ingresos computables.
-     *
-     * El subgrupo 76 no se incluye porque el código contable no permite
-     * distinguir los intereses comerciales computables de los rendimientos
-     * del capital mobiliario ajenos al Modelo 130.
-     *
-     * Las variaciones de existencias 61 y 71 se tratan por separado.
-     *
-     * @return array<string, string>
-     */
+    /** @return string[] */
     public static function incomes(): array
     {
-        return [
-            '70' => 'Ventas de mercaderías, de producción propia, de servicios, etc.',
-            '73' => 'Trabajos realizados para la empresa',
-            '74' => 'Subvenciones, donaciones y legados',
-            '75' => 'Otros ingresos de gestión',
-            '77' => 'Beneficios procedentes de activos no corrientes e ingresos excepcionales',
-            '79' => 'Excesos y aplicaciones de provisiones y de pérdidas por deterioro',
-        ];
-    }
-
-    /**
-     * Cuentas excluidas aunque pertenezcan a un subgrupo de ingresos.
-     *
-     * Se mantienen como ingresos computables del grupo 77 únicamente los
-     * ingresos excepcionales de la cuenta 778, y del grupo 79 las reversiones
-     * de existencias y créditos comerciales de las cuentas 793 y 794.
-     *
-     * @return array<string, string>
-     */
-    public static function excludedIncomes(): array
-    {
-        return [
-            '770' => 'Beneficios procedentes del inmovilizado intangible',
-            '771' => 'Beneficios procedentes del inmovilizado material',
-            '772' => 'Beneficios procedentes de inversiones inmobiliarias',
-            '773' => 'Beneficios procedentes de participaciones a largo plazo',
-            '774' => 'Diferencia negativa en combinaciones de negocios',
-            '775' => 'Beneficios por operaciones con obligaciones propias',
-
-            '790' => 'Reversión del deterioro del inmovilizado intangible',
-            '791' => 'Reversión del deterioro del inmovilizado material',
-            '792' => 'Reversión del deterioro de inversiones inmobiliarias',
-            '795' => 'Excesos de provisiones calculadas fuera de esta clase',
-            '796' => 'Reversión de deterioros financieros a largo plazo',
-            '797' => 'Reversión de deterioros de créditos no comerciales a largo plazo',
-            '798' => 'Reversión de deterioros financieros a corto plazo',
-            '799' => 'Reversión de deterioros de créditos no comerciales a corto plazo',
-        ];
+        Modelo130Config::ensureDefaults();
+        return Modelo130Config::prefixes(\FacturaScripts\Dinamic\Model\Mod130Conf::TIPO_INGRESO);
     }
 
     /**
@@ -194,18 +86,11 @@ final class Modelo130Accounts
     {
         $code = trim($code);
 
-        if ($code === '') {
+        if ($code === '' || static::isStockVariation($code)) {
             return false;
         }
 
-        if (static::matches($code, array_keys(static::excludedExpenses()))) {
-            return false;
-        }
-
-        return static::matches(
-            $code,
-            array_keys(static::expenses())
-        );
+        return static::matches($code, static::expenses());
     }
 
     /**
@@ -218,18 +103,11 @@ final class Modelo130Accounts
     {
         $code = trim($code);
 
-        if ($code === '') {
+        if ($code === '' || static::isStockVariation($code)) {
             return false;
         }
 
-        if (static::matches($code, array_keys(static::excludedIncomes()))) {
-            return false;
-        }
-
-        return static::matches(
-            $code,
-            array_keys(static::incomes())
-        );
+        return static::matches($code, static::incomes());
     }
 
     /**
@@ -291,9 +169,8 @@ final class Modelo130Accounts
     public static function queryPrefixes(): array
     {
         return array_values(array_unique(array_merge(
-            array_keys(static::expenses()),
-            array_keys(static::incomes()),
-            array_keys(static::stockVariations()),
+            static::expenses(),
+            static::incomes(),
             [static::WITHHOLDING_ACCOUNT]
         )));
     }

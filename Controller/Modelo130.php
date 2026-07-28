@@ -23,11 +23,14 @@ use FacturaScripts\Core\Base\Controller;
 use FacturaScripts\Core\DataSrc\Ejercicios;
 use FacturaScripts\Core\Response;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 use FacturaScripts\Dinamic\Model\Empresa;
 use FacturaScripts\Dinamic\Model\FormaPago;
+use FacturaScripts\Dinamic\Model\Mod130Conf;
 use FacturaScripts\Dinamic\Lib\Modelo130 as DinModelo130;
 use FacturaScripts\Dinamic\Lib\Modelo130Export as DinModelo130Export;
+use FacturaScripts\Dinamic\Lib\Modelo130Config as DinModelo130Config;
 
 /**
  * Description of Modelo130
@@ -39,6 +42,9 @@ use FacturaScripts\Dinamic\Lib\Modelo130Export as DinModelo130Export;
  */
 class Modelo130 extends Controller
 {
+    /** @var string */
+    public $activeTab = '';
+
     /** bool */
     public $applyGastosJustificacion = false;
 
@@ -88,6 +94,26 @@ class Modelo130 extends Controller
         return $exercise;
     }
 
+
+    public function getAccountRules(string $type): array
+    {
+        $rules = DinModelo130Config::rules($type);
+        foreach ($rules as $rule) {
+            $rule->display_description = DinModelo130Config::description($rule->codigo);
+        }
+        return $rules;
+    }
+
+    public function getExpenseRules(): array
+    {
+        return $this->getAccountRules(Mod130Conf::TIPO_GASTO);
+    }
+
+    public function getIncomeRules(): array
+    {
+        return $this->getAccountRules(Mod130Conf::TIPO_INGRESO);
+    }
+
     public function getPageData(): array
     {
         $data = parent::getPageData();
@@ -119,10 +145,28 @@ class Modelo130 extends Controller
 
         $action = $this->request->request->get('action', $this->request->input('action'));
         switch ($action) {
+            case 'autocomplete-account-prefix':
+                $this->autocompleteAccountPrefix();
+                return;
+
+            case 'add-account-prefix':
+                $this->addAccountPrefix();
+                break;
+
+            case 'delete-account-prefix':
+                $this->deleteAccountPrefix();
+                break;
+
+            case 'restore-account-prefixes':
+                $this->restoreAccountPrefixes();
+                break;
+
             case 'gen-accounting':
                 $this->createAccountingEntry();
                 return;
         }
+
+        DinModelo130Config::ensureDefaults();
 
         $this->codejercicio = $this->request->request->get('codejercicio', '');
         $this->period = $this->request->request->get('period', $this->period);
@@ -147,6 +191,105 @@ class Modelo130 extends Controller
         if ($action === 'download') {
             $this->downloadFile($response);
         }
+    }
+
+
+    protected function addAccountPrefix(): void
+    {
+        $type = (string) $this->request->request->get('tipo');
+        $this->activeTab = $type === Mod130Conf::TIPO_INGRESO ? 'income-accounts' : 'expense-accounts';
+
+        if (false === $this->validateFormToken()) {
+            return;
+        }
+
+        $code = trim((string) $this->request->request->get('codigo'));
+        if (DinModelo130Config::hasOverlap($code)) {
+            Tools::log()->warning('model-130-overlapping-prefix');
+            return;
+        }
+
+        $rule = new Mod130Conf();
+        $rule->codigo = $code;
+        $rule->tipo = $type;
+        if (false === $rule->save()) {
+            Tools::log()->error('record-save-error');
+            return;
+        }
+
+        Tools::log()->notice('record-updated-correctly');
+    }
+
+    protected function autocompleteAccountPrefix(): void
+    {
+        $this->setTemplate(false);
+
+        $type = (string) $this->request->get('tipo');
+        $firstDigit = $type === Mod130Conf::TIPO_INGRESO ? '7' : '6';
+        $term = trim((string) $this->request->get('term'));
+        $safeTerm = $this->dataBase->var2str($term . '%');
+        $safeGroup = $this->dataBase->var2str($firstDigit . '%');
+
+        $sql = 'SELECT DISTINCT codcuenta, descripcion FROM cuentas'
+            . ' WHERE codcuenta LIKE ' . $safeGroup
+            . ' AND (codcuenta LIKE ' . $safeTerm
+            . ' OR descripcion LIKE ' . $this->dataBase->var2str('%' . $term . '%') . ')'
+            . ' ORDER BY codcuenta ASC';
+
+        $list = [];
+        foreach ($this->dataBase->selectLimit($sql, 50) as $row) {
+            $code = trim((string) $row['codcuenta']);
+            if ($code === '' || !ctype_digit($code)) {
+                continue;
+            }
+            $list[] = [
+                'key' => Tools::fixHtml($code),
+                'value' => Tools::fixHtml($code . ' · ' . $row['descripcion'])
+            ];
+        }
+
+        if (empty($list)) {
+            $list[] = ['key' => null, 'value' => Tools::lang()->trans('no-data')];
+        }
+
+        $this->response->setContent(json_encode($list));
+    }
+
+    protected function deleteAccountPrefix(): void
+    {
+        $type = (string) $this->request->request->get('tipo');
+        $this->activeTab = $type === Mod130Conf::TIPO_INGRESO ? 'income-accounts' : 'expense-accounts';
+
+        if (false === $this->validateFormToken()) {
+            return;
+        }
+
+        $rule = new Mod130Conf();
+        if (false === $rule->load((int) $this->request->request->get('id'))) {
+            Tools::log()->error('record-not-found');
+            return;
+        }
+
+        if (false === $rule->delete()) {
+            Tools::log()->error('record-deleted-error');
+            return;
+        }
+
+        Tools::log()->notice('record-deleted-correctly');
+    }
+
+    protected function restoreAccountPrefixes(): void
+    {
+        $this->activeTab = (string) $this->request->request->get('tab', 'expense-accounts');
+        if (false === $this->validateFormToken()) {
+            return;
+        }
+
+        if (DinModelo130Config::restoreDefaults()) {
+            Tools::log()->notice('model-130-defaults-restored');
+            return;
+        }
+        Tools::log()->error('record-save-error');
     }
 
     protected function downloadFile(Response $response): void

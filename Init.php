@@ -18,8 +18,8 @@
 
 namespace FacturaScripts\Plugins\Modelo130;
 
-use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\Template\InitClass;
+use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
 
 final class Init extends InitClass
 {
@@ -33,5 +33,6 @@ final class Init extends InitClass
 
     public function update(): void
     {
+        Modelo130Config::ensureDefaults();
     }
 }
