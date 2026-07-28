@@ -152,9 +152,18 @@ final class Modelo130ConfigTest extends TestCase
         $originalRules = $this->snapshotRules();
 
         try {
-            $this->assertTrue($rule->loadWhere([Where::eq('codigo', '699999999999999')]));
+            $this->replaceRules([
+                [Mod130Conf::TIPO_GASTO, '699999999999999'],
+            ]);
 
             $rule = new Mod130Conf();
+
+            $this->assertTrue(
+                $rule->loadWhere([
+                    Where::eq('codigo', '699999999999999'),
+                ]),
+                'La regla de prueba debe existir'
+            );
 
             $this->assertSame(
                 Session::user()->nick,
