@@ -1,5 +1,5 @@
 {
-    "acc-concept-irpf-130": "IRPFaren zuzenketa %period%",
+    "acc-concept-irpf-130": "IRPF ordainketa zatikatua %period%",
     "accounting-created-130": "%codejercicio% urterako asientoa sortu da honako kontzeptuarekin: %concepto%",
     "aeat-file-invalid-exercise": "Ezin da AEAT fitxategia sortu: hautatutako ekitaldia ez da baliozkoa.",
     "aeat-file-invalid-length": "Ezin da AEAT fitxategia sortu: sortutako fitxategiak ez du espero zen luzera.",

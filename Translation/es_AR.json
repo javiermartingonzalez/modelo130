@@ -1,5 +1,5 @@
 {
-    "acc-concept-irpf-130": "Regularización de IRPF %period%",
+    "acc-concept-irpf-130": "Pago fraccionado IRPF %period%",
     "accounting-created-130": "Se ha creado el asiento en el ejercicio %codejercicio% con el concepto: %concepto%",
     "aeat-file-invalid-exercise": "No se puede generar el fichero AEAT: el ejercicio seleccionado no es válido.",
     "aeat-file-invalid-length": "No se puede generar el fichero AEAT: el fichero generado no tiene la longitud esperada.",

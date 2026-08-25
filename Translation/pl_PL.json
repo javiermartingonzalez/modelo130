@@ -1,5 +1,5 @@
 {
-    "acc-concept-irpf-130": "Korekta IRPF %period%",
+    "acc-concept-irpf-130": "Zaliczka IRPF %period%",
     "accounting-created-130": "Utworzono zapis księgowy w roku obrotowym %codejercicio% z tytułem: %concepto%",
     "aeat-file-invalid-exercise": "Nie można wygenerować pliku AEAT: wybrany rok obrotowy jest nieprawidłowy.",
     "aeat-file-invalid-length": "Nie można wygenerować pliku AEAT: wygenerowany plik nie ma oczekiwanej długości.",

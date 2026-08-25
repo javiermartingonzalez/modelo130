@@ -1,5 +1,5 @@
 {
-    "acc-concept-irpf-130": "Vyrovnání IRPF %period%",
+    "acc-concept-irpf-130": "Zálohová platba IRPF %period%",
     "accounting-created-130": "Účetní zápis byl vytvořen v účetním období %codejercicio% s popisem: %concepto%",
     "aeat-file-invalid-exercise": "Soubor AEAT nelze vygenerovat: vybrané účetní období není platné.",
     "aeat-file-invalid-length": "Soubor AEAT nelze vygenerovat: vytvořený soubor nemá očekávanou délku.",
