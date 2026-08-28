@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of Modelo130 plugin for FacturaScripts
  * Copyright (C) 2026 Carlos Garcia Gomez <carlos@facturascripts.com>
@@ -84,10 +85,9 @@ final class MigrateSubcuentas130Test extends TestCase
         (new MigrateSubcuentas130())->run();
 
         $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
-        $this->assertSame([], $this->currentRules());
+        $this->assertSame(0, (new Mod130Conf())->count());
 
         Modelo130Config::ensureDefaults();
-
         $this->assertNotEmpty((new Mod130Conf())->all([], [], 0, 0));
     }
 
@@ -97,7 +97,11 @@ final class MigrateSubcuentas130Test extends TestCase
      */
     public function testMigrationWithCustomLegacyConfig(): void
     {
-        $this->clearConfig();
+        if ($this->db()->tableExists(Mod130Conf::tableName())) {
+            $this->db()->exec('DROP TABLE ' . Mod130Conf::tableName());
+        }
+        \FacturaScripts\Core\DbUpdater::rebuild();
+
         $this->createLegacyTable();
         $this->insertLegacyRow('4730000000', 'deducible');
         $this->insertLegacyRow('6420000000', 'deducible');
