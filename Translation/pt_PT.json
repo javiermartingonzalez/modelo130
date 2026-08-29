@@ -1,5 +1,6 @@
 {
     "acc-concept-irpf-130": "Pagamento fracionado IRPF %period%",
+    "acc-concept-irpf-130-lines": "Pagamento fracionado IRPF modelo 130",
     "accounting-created-130": "Foi criado o lançamento no exercício %codejercicio% com o conceito: %concepto%",
     "aeat-file-invalid-exercise": "Não é possível gerar o ficheiro AEAT: o exercício selecionado não é válido.",
     "aeat-file-invalid-length": "Não é possível gerar o ficheiro AEAT: o ficheiro gerado não tem o comprimento esperado.",

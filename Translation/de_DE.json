@@ -1,5 +1,6 @@
 {
     "acc-concept-irpf-130": "IRPF-Teilzahlung %period%",
+    "acc-concept-irpf-130-lines": "IRPF-Teilzahlung Modell 130",
     "accounting-created-130": "Der Buchungssatz wurde im Geschäftsjahr %codejercicio% mit dem Verwendungszweck: %concepto% erstellt.",
     "aeat-file-invalid-exercise": "Die AEAT-Datei kann nicht erstellt werden: Das ausgewählte Geschäftsjahr ist ungültig.",
     "aeat-file-invalid-length": "Die AEAT-Datei kann nicht erstellt werden: Die erzeugte Datei hat nicht die erwartete Länge.",

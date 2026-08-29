@@ -1,5 +1,6 @@
 {
     "acc-concept-irpf-130": "Fractional IRPF payment %period%",
+    "acc-concept-irpf-130-lines": "Fractional IRPF payment model 130",
     "accounting-created-130": "An accounting entry has been created in fiscal year %codejercicio% with the concept: %concepto%",
     "aeat-file-invalid-exercise": "Cannot generate the AEAT file: the selected fiscal year is not valid.",
     "aeat-file-invalid-length": "Cannot generate the AEAT file: the generated file does not have the expected length.",

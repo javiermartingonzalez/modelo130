@@ -193,7 +193,7 @@ class Modelo130
 
         $partida1 = new Partida();
         $partida1->idasiento = $asiento->idasiento;
-        $partida1->concepto = $asiento->concepto;
+        $partida1->concepto = Tools::trans('acc-concept-irpf-130-lines');
         $partida1->debe = $amount;
         $partida1->codsubcuenta = '4730000000';
 
@@ -211,7 +211,7 @@ class Modelo130
 
         $partida2 = new Partida();
         $partida2->idasiento = $asiento->idasiento;
-        $partida2->concepto = $asiento->concepto;
+        $partida2->concepto = Tools::trans('acc-concept-irpf-130-lines');
         $partida2->haber = $amount;
         $partida2->codsubcuenta = !empty($bankAccount->codsubcuenta)
             ? $bankAccount->codsubcuenta

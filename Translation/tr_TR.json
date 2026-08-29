@@ -1,5 +1,6 @@
 {
     "acc-concept-irpf-130": "IRPF taksit ödemesi %period%",
+    "acc-concept-irpf-130-lines": "IRPF taksit ödemesi 130 modeli",
     "accounting-created-130": "%codejercicio% döneminde %concepto% açıklamasıyla yevmiye kaydı oluşturuldu",
     "aeat-file-invalid-exercise": "AEAT dosyası oluşturulamıyor: seçilen mali yıl geçerli değil.",
     "aeat-file-invalid-length": "AEAT dosyası oluşturulamıyor: oluşturulan dosya beklenen uzunlukta değil.",

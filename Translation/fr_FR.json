@@ -1,5 +1,6 @@
 {
     "acc-concept-irpf-130": "Paiement fractionné IRPF %period%",
+    "acc-concept-irpf-130-lines": "Paiement fractionné IRPF modèle 130",
     "accounting-created-130": "L'écriture a été créée dans l'exercice %codejercicio% avec le libellé : %concepto%",
     "aeat-file-invalid-exercise": "Impossible de générer le fichier AEAT : l'exercice sélectionné n'est pas valide.",
     "aeat-file-invalid-length": "Impossible de générer le fichier AEAT : le fichier généré n'a pas la longueur attendue.",

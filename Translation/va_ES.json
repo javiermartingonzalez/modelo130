@@ -1,5 +1,6 @@
 {
     "acc-concept-irpf-130": "Pagament fraccionat IRPF %period%",
+    "acc-concept-irpf-130-lines": "Pagament fraccionat IRPF model 130",
     "accounting-created-130": "S'ha creat l'assentament a l'exercici %codejercicio% amb el concepte: %concepto%",
     "aeat-file-invalid-exercise": "No es pot generar el fitxer AEAT: l'exercici seleccionat no és vàlid.",
     "aeat-file-invalid-length": "No es pot generar el fitxer AEAT: el fitxer generat no té la longitud esperada.",
