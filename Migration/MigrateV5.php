@@ -28,14 +28,17 @@ use RuntimeException;
 /**
  * Migra la configuración de subcuentas de la versión 4 (subcuentas_130)
  * al nuevo formato de prefijos (mod130_conf) de la versión 5.
+ * 
+ * Asimismo, actualiza los conceptos de los asientos de regularización al nuevo formato para que su
+ * categorización sea consistente con el nuevo controlador y se visualice la información más coherente.
  */
-class MigrateSubcuentas130 extends MigrationClass
+class MigrateV5 extends MigrationClass
 {
     /**
      * Nombre completo registrado:
-     * Modelo130::migrate_subcuentas_130_to_mod130_conf_v5
+     * Modelo130::migrate_v5
      */
-    const MIGRATION_NAME = 'migrate_subcuentas_130_to_mod130_conf_v5';
+    const MIGRATION_NAME = 'migrate_v5';
 
     private const LEGACY_TABLE = 'subcuentas_130';
 
@@ -50,7 +53,9 @@ class MigrateSubcuentas130 extends MigrationClass
 
     public function run(): void
     {
-        /*
+        $this->migrateAsientoConcepts();
+
+        /**
          * Si no existe subcuentas_130, el usuario ya está en el sistema
          * nuevo o es una instalación nueva. No hacemos nada.
          */
@@ -62,7 +67,7 @@ class MigrateSubcuentas130 extends MigrationClass
             'SELECT codsubcuenta, tipo FROM ' . self::LEGACY_TABLE
         );
 
-        /*
+        /**
          * Si no había configuración o únicamente estaban los defaults
          * antiguos, no hay personalización que conservar.
          *
@@ -74,10 +79,8 @@ class MigrateSubcuentas130 extends MigrationClass
             return;
         }
 
-        /*
-         * Existe configuración personalizada antigua.
-         *
-         * subcuentas_130 es la fuente de verdad:
+        /**
+         * Existe configuración personalizada antigua en subcuentas_130:
          * creamos/comprobamos mod130_conf, la dejamos vacía y volcamos
          * la configuración antigua convertida al nuevo formato.
          */
@@ -85,7 +88,7 @@ class MigrateSubcuentas130 extends MigrationClass
         $this->clearCurrentConfig();
         $this->migrateCustomConfig($rows);
 
-        /*
+        /**
          * La tabla antigua solo se elimina cuando la migración
          * ha terminado correctamente.
          */
@@ -106,13 +109,10 @@ class MigrateSubcuentas130 extends MigrationClass
         foreach ($rows as $row) {
             $code = trim((string) ($row['codsubcuenta'] ?? ''));
             $tipo = trim((string) ($row['tipo'] ?? ''));
-
             $found[$code] = $tipo;
         }
 
-        /*
-         * El orden del SELECT no debe influir en la comparación.
-         */
+
         $defaults = self::LEGACY_DEFAULTS;
 
         ksort($found);
@@ -122,18 +122,18 @@ class MigrateSubcuentas130 extends MigrationClass
     }
 
     /**
-     * Asegura que mod130_conf exista físicamente antes de insertar.
+     * Asegura que mod130_conf exista  antes de insertar.
      */
     private function ensureTargetTable(): void
     {
         if (!$this->db()->tableExists(Mod130Conf::tableName())) {
-            /*
+            /**
              * Limpiamos la caché de tablas comprobadas antes de
              * instanciar el modelo.
              */
             DbUpdater::rebuild();
 
-            /*
+            /**
              * El constructor del modelo crea/comprueba su tabla.
              */
             new Mod130Conf();
@@ -149,8 +149,7 @@ class MigrateSubcuentas130 extends MigrationClass
     /**
      * Dejamos mod130_conf vacía antes de volcar la configuración legacy.
      *
-     * No comprobamos si ya tenía datos: mientras exista subcuentas_130,
-     * la configuración legacy es la que debe migrarse.
+     * Mientras exista subcuentas_130, la configuración legacy es la que debe priorizarse.
      */
     private function clearCurrentConfig(): void
     {
@@ -168,9 +167,9 @@ class MigrateSubcuentas130 extends MigrationClass
      */
     private function migrateCustomConfig(array $rows): void
     {
-        /*
-         * Toda configuración personalizada parte de los prefijos
-         * generales de gastos e ingresos.
+        /**
+         * Toda configuración personalizada anterior, siempre
+         * partía de los prefijos generales de gastos e ingresos.
          */
         $rules = [
             Mod130Conf::TIPO_GASTO => ['60'],
@@ -180,7 +179,7 @@ class MigrateSubcuentas130 extends MigrationClass
         foreach ($rows as $row) {
             $code = trim((string) ($row['codsubcuenta'] ?? ''));
 
-            /*
+            /**
              * La 473 ya se trata internamente y no debe convertirse
              * en una regla configurable.
              */
@@ -257,6 +256,37 @@ class MigrateSubcuentas130 extends MigrationClass
         }
 
         return false;
+    }
+
+    /**
+     * Modificamos los conceptos de los asientos (en español) para que sean consistentes con la nueva configuración.
+     *
+     * La misma se ha realizado para compatibilizarse con laS configuraciones por defecto de AsientosPredefinidos.
+     */
+
+    private function migrateAsientoConcepts(): void
+    {
+        if (!$this->db()->tableExists('asientos')) {
+            return;
+        }
+    
+        for ($trimestre = 1; $trimestre <= 4; $trimestre++) {
+            $oldConcepto = 'Regularización de IRPF T' . $trimestre;
+            $newConcepto = 'Pago fraccionado IRPF T' . $trimestre;
+    
+            $sql = 'UPDATE asientos SET concepto = '
+                . $this->db()->var2str($newConcepto)
+                . ' WHERE concepto = '
+                . $this->db()->var2str($oldConcepto)
+                . ';';
+    
+            if (!$this->db()->exec($sql)) {
+                throw new RuntimeException(
+                    'No se pudo actualizar el concepto del asiento '
+                    . $oldConcepto
+                );
+            }
+        }
     }
 
     private function dropLegacyTable(): void

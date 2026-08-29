@@ -23,7 +23,7 @@ namespace FacturaScripts\Test\Plugins;
 use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Dinamic\Model\Mod130Conf;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
-use FacturaScripts\Plugins\Modelo130\Migration\MigrateSubcuentas130;
+use FacturaScripts\Plugins\Modelo130\Migration\MigrateV5;
 use FacturaScripts\Test\Traits\DefaultSettingsTrait;
 use FacturaScripts\Test\Traits\LogErrorsTrait;
 use PHPUnit\Framework\TestCase;
@@ -31,7 +31,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Pruebas de la migración de subcuentas_130 a mod130_conf.
  */
-final class MigrateSubcuentas130Test extends TestCase
+final class MigrateV5Test extends TestCase
 {
     use DefaultSettingsTrait;
     use LogErrorsTrait;
@@ -62,7 +62,7 @@ final class MigrateSubcuentas130Test extends TestCase
         $defaults = Modelo130Config::buildDefaultRules();
         $this->seedConfig($defaults);
 
-        (new MigrateSubcuentas130())->run();
+        (new MigrateV5())->run();
 
         $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
         $this->assertSame(
@@ -82,7 +82,7 @@ final class MigrateSubcuentas130Test extends TestCase
         $this->insertLegacyRow('4730000000', 'deducible');
         $this->insertLegacyRow('6420000000', 'deducible');
 
-        (new MigrateSubcuentas130())->run();
+        (new MigrateV5())->run();
 
         $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
         $this->assertSame(0, (new Mod130Conf())->count());
@@ -107,7 +107,7 @@ final class MigrateSubcuentas130Test extends TestCase
         $this->insertLegacyRow('6420000000', 'deducible');
         $this->insertLegacyRow('7550000000', 'ingreso');
 
-        (new MigrateSubcuentas130())->run();
+        (new MigrateV5())->run();
 
         $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
         $this->assertSame(
@@ -117,6 +117,38 @@ final class MigrateSubcuentas130Test extends TestCase
             ],
             $this->currentRules()
         );
+    }
+
+
+    /**
+     * Actualiza el concepto antiguo de los asientos al nuevo formato.
+     */
+    public function testMigrationUpdatesAsientoConcept(): void
+    {
+        $ejercicios = $this->db()->select(
+            'SELECT idempresa, codejercicio, fechainicio FROM ejercicios LIMIT 1'
+        );
+        $this->assertNotEmpty($ejercicios);
+
+        $asiento = new \FacturaScripts\Dinamic\Model\Asiento();
+        $asiento->idempresa = $ejercicios[0]['idempresa'];
+        $asiento->codejercicio = $ejercicios[0]['codejercicio'];
+        $asiento->concepto = 'Regularización de IRPF T1';
+        $asiento->fecha = $ejercicios[0]['fechainicio'];
+        $asiento->importe = 100.0;
+
+        $this->assertTrue($asiento->save());
+
+        (new MigrateV5())->run();
+
+        $updated = new \FacturaScripts\Dinamic\Model\Asiento();
+        $this->assertTrue($updated->load($asiento->idasiento));
+        $this->assertSame(
+            'Pago fraccionado IRPF T1',
+            $updated->concepto
+        );
+
+        $this->assertTrue($updated->delete());
     }
 
     /**

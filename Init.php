@@ -22,7 +22,7 @@ use FacturaScripts\Core\Template\InitClass;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
 
 use FacturaScripts\Core\Migrations;
-use FacturaScripts\Plugins\Modelo130\Migration\MigrateSubcuentas130;
+use FacturaScripts\Plugins\Modelo130\Migration\MigrateV5;
 
 final class Init extends InitClass
 {
@@ -36,7 +36,7 @@ final class Init extends InitClass
 
     public function update(): void
     {
-        Migrations::runPluginMigration(new MigrateSubcuentas130());
+        Migrations::runPluginMigration(new MigrateV5());
         Modelo130Config::ensureDefaults();
     }
 }
