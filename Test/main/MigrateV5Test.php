@@ -45,20 +45,43 @@ final class MigrateV5Test extends TestCase
 {
     use DefaultSettingsTrait;
     use LogErrorsTrait;
+    use Modelo130Fixtures;
 
     private const LEGACY_TABLE = 'subcuentas_130';
 
     public static function setUpBeforeClass(): void
     {
         self::setDefaultSettings();
-        self::installAccountingPlan();
+        self::ensureExerciseWithAccountingPlan();
     }
 
-    protected function tearDown(): void
+    /**
+     * Una subcuenta legacy genérica se convierte en un prefijo demasiado amplio
+     * (6 o 7), así que debe descartarse y dejar solo los prefijos generales.
+     */
+    public function testMigrationDiscardsTooWidePrefixes(): void
     {
-        $this->dropLegacyTable();
-        $this->clearConfig();
-        $this->logErrors();
+        if ($this->db()->tableExists(Mod130Conf::tableName())) {
+            $this->db()->exec('DROP TABLE ' . Mod130Conf::tableName());
+        }
+        DbUpdater::rebuild();
+
+        $this->createLegacyTable();
+        $this->insertLegacyRow('6000000000', 'deducible');
+        $this->insertLegacyRow('7000000000', 'ingreso');
+        $this->insertLegacyRow('6420000000', 'deducible');
+        $this->insertLegacyRow('4730000000', 'deducible');
+        $this->insertLegacyRow('6210000000', 'desconocido');
+
+        (new MigrateV5())->run();
+
+        $this->assertSame(
+            [
+                Mod130Conf::TIPO_GASTO => ['60', '642'],
+                Mod130Conf::TIPO_INGRESO => ['70'],
+            ],
+            $this->currentRules()
+        );
     }
 
     /**
@@ -79,74 +102,6 @@ final class MigrateV5Test extends TestCase
             $this->normalizeRules($defaults),
             $this->currentRules()
         );
-    }
-
-    /**
-     * Con solo las subcuentas por defecto de la v4 no hay personalización que
-     * conservar: se elimina la tabla antigua y la configuración queda vacía
-     * para que ensureDefaults() la rellene con los valores actuales.
-     */
-    public function testMigrationWithOnlyLegacyDefaults(): void
-    {
-        $this->clearConfig();
-        $this->createLegacyTable();
-        $this->insertLegacyRow('4730000000', 'deducible');
-        $this->insertLegacyRow('6420000000', 'deducible');
-
-        (new MigrateV5())->run();
-
-        $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
-        $this->assertSame(0, (new Mod130Conf())->count());
-
-        Modelo130Config::ensureDefaults();
-        $this->assertNotEmpty((new Mod130Conf())->all([], [], 0, 0));
-    }
-
-    /**
-     * Con configuración personalizada, se migran los prefijos conservando 60/70
-     * y excluyendo la cuenta 473 del core.
-     */
-    public function testMigrationWithCustomLegacyConfig(): void
-    {
-        if ($this->db()->tableExists(Mod130Conf::tableName())) {
-            $this->db()->exec('DROP TABLE ' . Mod130Conf::tableName());
-        }
-        DbUpdater::rebuild();
-
-        $this->createLegacyTable();
-        $this->insertLegacyRow('4730000000', 'deducible');
-        $this->insertLegacyRow('6420000000', 'deducible');
-        $this->insertLegacyRow('7550000000', 'ingreso');
-
-        (new MigrateV5())->run();
-
-        $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
-        $this->assertSame(
-            [
-                Mod130Conf::TIPO_GASTO => ['60', '642'],
-                Mod130Conf::TIPO_INGRESO => ['70', '755'],
-            ],
-            $this->currentRules()
-        );
-    }
-
-
-    /**
-     * Los asientos de liquidación de versiones anteriores se renombran y pasan
-     * a llevar el identificador del trimestre en el campo documento.
-     */
-    public function testMigrationUpdatesAsientoConcept(): void
-    {
-        $asiento = $this->createLegacyPaymentEntry(true);
-
-        (new MigrateV5())->run();
-
-        $updated = new Asiento();
-        $this->assertTrue($updated->load($asiento->idasiento));
-        $this->assertSame('Pago fraccionado IRPF T1', $updated->concepto);
-        $this->assertSame(Modelo130::entryDocument('T1'), $updated->documento);
-
-        $this->assertTrue($updated->delete());
     }
 
     /**
@@ -197,10 +152,28 @@ final class MigrateV5Test extends TestCase
     }
 
     /**
-     * Una subcuenta legacy genérica se convierte en un prefijo demasiado amplio
-     * (6 o 7), así que debe descartarse y dejar solo los prefijos generales.
+     * Los asientos de liquidación de versiones anteriores se renombran y pasan
+     * a llevar el identificador del trimestre en el campo documento.
      */
-    public function testMigrationDiscardsTooWidePrefixes(): void
+    public function testMigrationUpdatesAsientoConcept(): void
+    {
+        $asiento = $this->createLegacyPaymentEntry(true);
+
+        (new MigrateV5())->run();
+
+        $updated = new Asiento();
+        $this->assertTrue($updated->load($asiento->idasiento));
+        $this->assertSame('Pago fraccionado IRPF T1', $updated->concepto);
+        $this->assertSame(Modelo130::entryDocument('T1'), $updated->documento);
+
+        $this->assertTrue($updated->delete());
+    }
+
+    /**
+     * Con configuración personalizada, se migran los prefijos conservando 60/70
+     * y excluyendo la cuenta 473 del core.
+     */
+    public function testMigrationWithCustomLegacyConfig(): void
     {
         if ($this->db()->tableExists(Mod130Conf::tableName())) {
             $this->db()->exec('DROP TABLE ' . Mod130Conf::tableName());
@@ -208,50 +181,55 @@ final class MigrateV5Test extends TestCase
         DbUpdater::rebuild();
 
         $this->createLegacyTable();
-        $this->insertLegacyRow('6000000000', 'deducible');
-        $this->insertLegacyRow('7000000000', 'ingreso');
-        $this->insertLegacyRow('6420000000', 'deducible');
         $this->insertLegacyRow('4730000000', 'deducible');
-        $this->insertLegacyRow('6210000000', 'desconocido');
+        $this->insertLegacyRow('6420000000', 'deducible');
+        $this->insertLegacyRow('7550000000', 'ingreso');
 
         (new MigrateV5())->run();
 
+        $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
         $this->assertSame(
             [
                 Mod130Conf::TIPO_GASTO => ['60', '642'],
-                Mod130Conf::TIPO_INGRESO => ['70'],
+                Mod130Conf::TIPO_INGRESO => ['70', '755'],
             ],
             $this->currentRules()
         );
     }
 
     /**
-     * Elimina la marca de migración ejecutada del registro de MyFiles, para que
-     * la prueba no dependa de ejecuciones anteriores.
+     * Con solo las subcuentas por defecto de la v4 no hay personalización que
+     * conservar: se elimina la tabla antigua y la configuración queda vacía
+     * para que ensureDefaults() la rellene con los valores actuales.
      */
-    private function forgetMigration(): void
+    public function testMigrationWithOnlyLegacyDefaults(): void
     {
-        $file = Tools::folder('MyFiles', 'migrations.json');
+        $this->clearConfig();
+        $this->createLegacyTable();
+        $this->insertLegacyRow('4730000000', 'deducible');
+        $this->insertLegacyRow('6420000000', 'deducible');
 
-        if (false === file_exists($file)) {
-            return;
+        (new MigrateV5())->run();
+
+        $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
+        $this->assertSame(0, (new Mod130Conf())->count());
+
+        if (false === self::hasAccountingPlan()) {
+            $this->markTestSkipped('No hay plan contable instalado.');
         }
 
-        $executed = json_decode((string)file_get_contents($file), true);
+        Modelo130Config::ensureDefaults();
+        $this->assertNotEmpty(
+            (new Mod130Conf())->all([], [], 0, 0),
+            'ensureDefaults() debe rellenar la configuración vacía'
+        );
+    }
 
-        if (false === is_array($executed)) {
-            return;
+    private function clearConfig(): void
+    {
+        foreach ((new Mod130Conf())->all([], [], 0, 0) as $rule) {
+            $this->assertTrue($rule->delete());
         }
-
-        $name = MigrateV5::getFullMigrationName();
-        $executed = array_values(array_filter(
-            $executed,
-            function ($item) use ($name) {
-                return $item !== $name;
-            }
-        ));
-
-        file_put_contents($file, json_encode($executed, JSON_PRETTY_PRINT));
     }
 
     /**
@@ -299,28 +277,6 @@ final class MigrateV5Test extends TestCase
         return $asiento;
     }
 
-    /**
-     * @param array<string, string[]> $rules
-     */
-    private function seedConfig(array $rules): void
-    {
-        foreach ($rules as $tipo => $codes) {
-            foreach ($codes as $code) {
-                $rule = new Mod130Conf();
-                $rule->codigo = $code;
-                $rule->tipo = $tipo;
-                $this->assertTrue($rule->save());
-            }
-        }
-    }
-
-    private function clearConfig(): void
-    {
-        foreach ((new Mod130Conf())->all([], [], 0, 0) as $rule) {
-            $this->assertTrue($rule->delete());
-        }
-    }
-
     private function createLegacyTable(): void
     {
         $this->dropLegacyTable();
@@ -337,23 +293,6 @@ final class MigrateV5Test extends TestCase
             . 'PRIMARY KEY (id),'
             . 'UNIQUE (codsubcuenta)'
             . ');';
-
-        $this->assertTrue($this->db()->exec($sql));
-    }
-
-    private function dropLegacyTable(): void
-    {
-        if ($this->db()->tableExists(self::LEGACY_TABLE)) {
-            $this->db()->exec('DROP TABLE ' . self::LEGACY_TABLE);
-        }
-    }
-
-    private function insertLegacyRow(string $codsubcuenta, string $tipo): void
-    {
-        $sql = 'INSERT INTO ' . self::LEGACY_TABLE
-            . ' (codsubcuenta, tipo) VALUES ('
-            . $this->db()->var2str($codsubcuenta) . ', '
-            . $this->db()->var2str($tipo) . ');';
 
         $this->assertTrue($this->db()->exec($sql));
     }
@@ -378,6 +317,64 @@ final class MigrateV5Test extends TestCase
         return $result;
     }
 
+    private function db(): DataBase
+    {
+        static $db = null;
+
+        if ($db === null) {
+            $db = new DataBase();
+            $db->connect();
+        }
+
+        return $db;
+    }
+
+    private function dropLegacyTable(): void
+    {
+        if ($this->db()->tableExists(self::LEGACY_TABLE)) {
+            $this->db()->exec('DROP TABLE ' . self::LEGACY_TABLE);
+        }
+    }
+
+    /**
+     * Elimina la marca de migración ejecutada del registro de MyFiles, para que
+     * la prueba no dependa de ejecuciones anteriores.
+     */
+    private function forgetMigration(): void
+    {
+        $file = Tools::folder('MyFiles', 'migrations.json');
+
+        if (false === file_exists($file)) {
+            return;
+        }
+
+        $executed = json_decode((string)file_get_contents($file), true);
+
+        if (false === is_array($executed)) {
+            return;
+        }
+
+        $name = MigrateV5::getFullMigrationName();
+        $executed = array_values(array_filter(
+            $executed,
+            function ($item) use ($name) {
+                return $item !== $name;
+            }
+        ));
+
+        file_put_contents($file, json_encode($executed, JSON_PRETTY_PRINT));
+    }
+
+    private function insertLegacyRow(string $codsubcuenta, string $tipo): void
+    {
+        $sql = 'INSERT INTO ' . self::LEGACY_TABLE
+            . ' (codsubcuenta, tipo) VALUES ('
+            . $this->db()->var2str($codsubcuenta) . ', '
+            . $this->db()->var2str($tipo) . ');';
+
+        $this->assertTrue($this->db()->exec($sql));
+    }
+
     /**
      * @param array<string, string[]> $rules
      *
@@ -396,15 +393,25 @@ final class MigrateV5Test extends TestCase
         return $result;
     }
 
-    private function db(): DataBase
+    /**
+     * @param array<string, string[]> $rules
+     */
+    private function seedConfig(array $rules): void
     {
-        static $db = null;
-
-        if ($db === null) {
-            $db = new DataBase();
-            $db->connect();
+        foreach ($rules as $tipo => $codes) {
+            foreach ($codes as $code) {
+                $rule = new Mod130Conf();
+                $rule->codigo = $code;
+                $rule->tipo = $tipo;
+                $this->assertTrue($rule->save());
+            }
         }
+    }
 
-        return $db;
+    protected function tearDown(): void
+    {
+        $this->dropLegacyTable();
+        $this->clearConfig();
+        $this->logErrors();
     }
 }

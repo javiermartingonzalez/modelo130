@@ -38,12 +38,13 @@ use PHPUnit\Framework\TestCase;
 final class Modelo130Test extends TestCase
 {
     use DefaultSettingsTrait;
+    use Modelo130Fixtures;
     use LogErrorsTrait;
 
     public static function setUpBeforeClass(): void
     {
         self::setDefaultSettings();
-        self::installAccountingPlan();
+        self::ensureExerciseWithAccountingPlan();
     }
 
     /**

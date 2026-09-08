@@ -45,6 +45,7 @@ use PHPUnit\Framework\TestCase;
 final class Modelo130AccountingTest extends TestCase
 {
     use DefaultSettingsTrait;
+    use Modelo130Fixtures;
     use LogErrorsTrait;
     use RandomDataTrait;
 
@@ -93,7 +94,7 @@ final class Modelo130AccountingTest extends TestCase
     public static function setUpBeforeClass(): void
     {
         self::setDefaultSettings();
-        self::installAccountingPlan();
+        self::ensureExerciseWithAccountingPlan();
 
         // partimos siempre de la configuración de cuentas predeterminada
         Modelo130Config::restoreDefaults();
