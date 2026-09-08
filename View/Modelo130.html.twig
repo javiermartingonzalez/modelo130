@@ -119,6 +119,19 @@
                         <p class="mb-0">{{ trans('model-130-r') }}</p>
                         <p class="mb-0">{{ trans('model-130-desc') }}</p>
                     </div>
+                    {% if fsc.result.unaccountedSales > 0 or fsc.result.unaccountedPurchases > 0 %}
+                        <div class="alert alert-warning">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                            {{ trans('model-130-unaccounted-invoices') }}
+                            <a href="ListFacturaCliente" class="alert-link">
+                                {{ fsc.result.unaccountedSales }} {{ trans('customer-invoices')|lower }}
+                            </a>
+                            ·
+                            <a href="ListFacturaProveedor" class="alert-link">
+                                {{ fsc.result.unaccountedPurchases }} {{ trans('supplier-invoices')|lower }}
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -138,8 +151,15 @@
                         {{ trans('tax-expenses') }}
                         <div class="input-group">
                             <span class="input-group-text">02</span>
-                            <input type="number" value="{{ fsc.result.taxbaseGastos }}" class="form-control text-end" readonly/>
+                            <input type="number" value="{{ fsc.result.taxbaseGastosTotal }}" class="form-control text-end" readonly/>
                         </div>
+                        {% if fsc.result.gastosJustificacion > 0 %}
+                            <p class="form-text text-muted mb-0">
+                                {{ money(fsc.result.taxbaseGastos) }}
+                                + {{ money(fsc.result.gastosJustificacion) }}
+                                {{ trans('gastos-justificacion')|lower }}
+                            </p>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg-3">
@@ -177,7 +197,7 @@
                         <div class="input-group">
                             <input type="number" value="{{ fsc.result.gastosJustificacion }}" class="form-control text-end" readonly/>
                         </div>
-                        {% if fsc.result.gastosJustificacion >= 2000 %}
+                        {% if fsc.result.gastosJustificacion >= fsc.result.limiteGastosJustificacion %}
                             <p class="form-text text-warning fw-bold">
                                 <i class="fa-solid fa-triangle-exclamation me-1"></i>
                                 {{ trans('gastos-justificacion-limit') }}
@@ -450,15 +470,12 @@
                             </tr>
                         {% endfor %}
                     </tbody>
-{# 
                     <tfoot>
                         <tr>
                             <th colspan="5" class="text-end">{{ trans('totals') }}</th>
                             <th class="text-end">{{ money(accountingTotal) }}</th>
-                            <th></th>
                         </tr>
-                    </tfoot> 
-#}
+                    </tfoot>
                 </table>
             </div>
         </div>
@@ -533,6 +550,11 @@
                     <input type="hidden" name="idempresa" value="{{ exercise.idempresa }}">
                     <input type="hidden" name="codejercicio" value="{{ fsc.codejercicio }}">
                     <input type="hidden" name="period" value="{{ fsc.period }}">
+                    {% if fsc.applyGastosJustificacion %}
+                        <input type="hidden" name="applyGastosJustificacion" value="1">
+                    {% endif %}
+                    <input type="hidden" name="todeduct" value="{{ fsc.todeduct }}">
+                    <input type="hidden" name="gastosJustificacionPct" value="{{ fsc.gastosJustificacionPct }}">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="date">{{ trans('accounting-entry-date') }}</label>

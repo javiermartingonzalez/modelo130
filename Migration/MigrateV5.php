@@ -23,6 +23,8 @@ use FacturaScripts\Core\DbUpdater;
 use FacturaScripts\Core\Template\MigrationClass;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Model\Mod130Conf;
+use FacturaScripts\Plugins\Modelo130\Lib\Modelo130;
+use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Accounts;
 use RuntimeException;
 
 /**
@@ -47,6 +49,15 @@ class MigrateV5 extends MigrationClass
         '4730000000' => 'deducible',
         '6420000000' => 'deducible',
     ];
+
+    /**
+     * Longitud mínima de un prefijo migrado.
+     *
+     * Un prefijo de un solo dígito abarcaría el grupo contable completo,
+     * incluidas cuentas que no son deducibles (por ejemplo la 630, impuesto
+     * sobre beneficios), así que se descarta y se deja solo el prefijo general.
+     */
+    private const MIN_PREFIX_LENGTH = 2;
 
     private const LEGACY_TIPO_DEDUCIBLE = 'deducible';
     private const LEGACY_TIPO_INGRESO = 'ingreso';
@@ -197,6 +208,15 @@ class MigrateV5 extends MigrationClass
                 continue;
             }
 
+            if (strlen($prefix) < self::MIN_PREFIX_LENGTH) {
+                Tools::log()->warning(
+                    'Modelo 130: se ha descartado la subcuenta ' . $code
+                    . ' porque abarcaría el grupo contable completo.'
+                    . ' Revisa la configuración de cuentas del plugin.'
+                );
+                continue;
+            }
+
             $rules[$tipo][] = $prefix;
         }
 
@@ -259,33 +279,75 @@ class MigrateV5 extends MigrationClass
     }
 
     /**
-     * Modificamos los conceptos de los asientos (en español) para que sean consistentes con la nueva configuración.
+     * Actualiza los asientos de liquidación creados por versiones anteriores
+     * del plugin.
      *
-     * La misma se ha realizado para compatibilizarse con laS configuraciones por defecto de AsientosPredefinidos.
+     * Hace dos cosas:
+     *
+     * - Renombra el concepto en español al nuevo texto, para que coincida con
+     *   la plantilla por defecto del plugin AsientosPredefinidos.
+     * - Rellena el campo documento con el identificador del trimestre, que es
+     *   lo que usa ahora el cálculo para reconocer el asiento del período sin
+     *   depender del idioma del usuario.
+     *
+     * El UPDATE se limita a asientos que tengan alguna partida en la cuenta de
+     * retenciones y pagos a cuenta, para no tocar asientos ajenos al plugin que
+     * casualmente tuvieran ese mismo concepto.
      */
-
     private function migrateAsientoConcepts(): void
     {
-        if (!$this->db()->tableExists('asientos')) {
+        if (
+            !$this->db()->tableExists('asientos')
+            || !$this->db()->tableExists('partidas')
+        ) {
             return;
         }
-    
+
+        $prefix = $this->db()->var2str(
+            Modelo130Accounts::WITHHOLDING_ACCOUNT . '%'
+        );
+
+        $updated = 0;
+
         for ($trimestre = 1; $trimestre <= 4; $trimestre++) {
-            $oldConcepto = 'Regularización de IRPF T' . $trimestre;
-            $newConcepto = 'Pago fraccionado IRPF T' . $trimestre;
-    
+            $period = 'T' . $trimestre;
+            $oldConcepto = 'Regularización de IRPF ' . $period;
+            $newConcepto = 'Pago fraccionado IRPF ' . $period;
+
+            $where = ' WHERE concepto = '
+                . $this->db()->var2str($oldConcepto)
+                . ' AND EXISTS ('
+                . 'SELECT 1 FROM partidas p'
+                . ' WHERE p.idasiento = asientos.idasiento'
+                . ' AND p.codsubcuenta LIKE ' . $prefix
+                . ')';
+
+            $count = $this->db()->select(
+                'SELECT COUNT(*) as total FROM asientos' . $where . ';'
+            );
+
             $sql = 'UPDATE asientos SET concepto = '
                 . $this->db()->var2str($newConcepto)
-                . ' WHERE concepto = '
-                . $this->db()->var2str($oldConcepto)
+                . ', documento = '
+                . $this->db()->var2str(Modelo130::entryDocument($period))
+                . $where
                 . ';';
-    
+
             if (!$this->db()->exec($sql)) {
                 throw new RuntimeException(
                     'No se pudo actualizar el concepto del asiento '
                     . $oldConcepto
                 );
             }
+
+            $updated += (int)($count[0]['total'] ?? 0);
+        }
+
+        if ($updated > 0) {
+            Tools::log()->notice(
+                'Modelo 130: se han actualizado ' . $updated
+                . ' asientos de liquidación de versiones anteriores.'
+            );
         }
     }
 

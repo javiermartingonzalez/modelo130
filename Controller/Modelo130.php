@@ -23,7 +23,6 @@ use FacturaScripts\Core\Base\Controller;
 use FacturaScripts\Core\DataSrc\Ejercicios;
 use FacturaScripts\Core\Response;
 use FacturaScripts\Core\Tools;
-use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 use FacturaScripts\Dinamic\Model\Empresa;
 use FacturaScripts\Dinamic\Model\FormaPago;
@@ -31,6 +30,7 @@ use FacturaScripts\Dinamic\Model\Mod130Conf;
 use FacturaScripts\Dinamic\Lib\Modelo130 as DinModelo130;
 use FacturaScripts\Dinamic\Lib\Modelo130Export as DinModelo130Export;
 use FacturaScripts\Dinamic\Lib\Modelo130Config as DinModelo130Config;
+use FacturaScripts\Dinamic\Lib\Modelo130Accounts as DinModelo130Accounts;
 
 /**
  * Description of Modelo130
@@ -163,7 +163,7 @@ class Modelo130 extends Controller
 
             case 'gen-accounting':
                 $this->createAccountingEntry();
-                return;
+                break;
         }
 
         DinModelo130Config::ensureDefaults();
@@ -217,6 +217,7 @@ class Modelo130 extends Controller
             return;
         }
 
+        DinModelo130Accounts::resetCache();
         Tools::log()->notice('record-updated-correctly');
     }
 
@@ -275,6 +276,7 @@ class Modelo130 extends Controller
             return;
         }
 
+        DinModelo130Accounts::resetCache();
         Tools::log()->notice('record-deleted-correctly');
     }
 
@@ -286,6 +288,7 @@ class Modelo130 extends Controller
         }
 
         if (DinModelo130Config::restoreDefaults()) {
+            DinModelo130Accounts::resetCache();
             Tools::log()->notice('model-130-defaults-restored');
             return;
         }
@@ -370,7 +373,7 @@ class Modelo130 extends Controller
         $period = (string)$this->request->request->get('period');
         $date = (string)$this->request->request->get('date');
         $amount = (float)$this->request->request->get('amount');
-        $paymentMethodId = (int)$this->request->request->get('paymentMethod');
+        $paymentMethodId = trim((string)$this->request->request->get('paymentMethod'));
 
         if (
             DinModelo130::generateEntries(
@@ -379,7 +382,7 @@ class Modelo130 extends Controller
                 $period,
                 $date,
                 $amount,
-                $paymentMethodId
+                $paymentMethodId === '' ? null : $paymentMethodId
             )
         ) {
             Tools::log()->notice('record-updated-correctly');

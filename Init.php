@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of Modelo130 plugin for FacturaScripts
- * Copyright (C) 2021-2025 Carlos Garcia Gomez <carlos@facturascripts.com>
+ * Copyright (C) 2021-2026 Carlos Garcia Gomez <carlos@facturascripts.com>
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -18,10 +18,9 @@
 
 namespace FacturaScripts\Plugins\Modelo130;
 
+use FacturaScripts\Core\Migrations;
 use FacturaScripts\Core\Template\InitClass;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
-
-use FacturaScripts\Core\Migrations;
 use FacturaScripts\Plugins\Modelo130\Migration\MigrateV5;
 
 final class Init extends InitClass

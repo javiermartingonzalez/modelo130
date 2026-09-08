@@ -19,6 +19,8 @@
 
 namespace FacturaScripts\Plugins\Modelo130\Lib;
 
+use FacturaScripts\Dinamic\Model\Mod130Conf;
+
 /**
  * Centraliza las cuentas contables utilizadas para calcular el Modelo 130.
  *
@@ -32,11 +34,19 @@ namespace FacturaScripts\Plugins\Modelo130\Lib;
  * - excluye las partidas que, con carácter general, no forman parte del
  *   rendimiento de la actividad o se calculan fuera de esta clase;
  * - trata las variaciones de existencias según su saldo acumulado.
+ *
+ * Los prefijos de gasto e ingreso se leen de la configuración una única vez
+ * por petición y quedan memorizados, ya que isExpense() e isIncome() se
+ * invocan una vez por cada partida contable del período.
+ *
+ * @author Carlos Garcia Gomez        <carlos@facturascripts.com>
+ * @author Javier Martín González     <javier@javiermarting.es>
+ * @author Daniel Fernández Giménez   <contacto@danielfg.es>
  */
-final class Modelo130Accounts
+class Modelo130Accounts
 {
     /**
-     * Hacienda pública, retenciones y pagos a cuenta.
+     * Prefijo por defecto de Hacienda pública, retenciones y pagos a cuenta.
      *
      * La cuenta 473 puede contener:
      * - retenciones practicadas en facturas;
@@ -44,21 +54,98 @@ final class Modelo130Accounts
      *
      * La diferencia se determina comprobando si el asiento tiene una factura
      * asociada.
+     *
+     * Se utiliza como respaldo cuando el plan contable no tiene ninguna cuenta
+     * marcada como especial IRPF.
      */
     public const WITHHOLDING_ACCOUNT = '473';
 
-    /** @return string[] */
+    /**
+     * Prefijos de gasto memorizados. null mientras no se han cargado.
+     *
+     * @var string[]|null
+     */
+    private static $expenses = null;
+
+    /**
+     * Prefijos de ingreso memorizados. null mientras no se han cargado.
+     *
+     * @var string[]|null
+     */
+    private static $incomes = null;
+
+    /**
+     * Prefijo de la cuenta de retenciones en uso.
+     *
+     * @var string
+     */
+    private static $withholdingPrefix = self::WITHHOLDING_ACCOUNT;
+
+    /**
+     * Devuelve los prefijos de las cuentas de gasto configuradas.
+     *
+     * @return string[]
+     */
     public static function expenses(): array
     {
-        Modelo130Config::ensureDefaults();
-        return Modelo130Config::prefixes(\FacturaScripts\Dinamic\Model\Mod130Conf::TIPO_GASTO);
+        if (null === self::$expenses) {
+            Modelo130Config::ensureDefaults();
+            self::$expenses = Modelo130Config::prefixes(Mod130Conf::TIPO_GASTO);
+        }
+
+        return self::$expenses;
     }
 
-    /** @return string[] */
+    /**
+     * Devuelve los prefijos de las cuentas de ingreso configuradas.
+     *
+     * @return string[]
+     */
     public static function incomes(): array
     {
-        Modelo130Config::ensureDefaults();
-        return Modelo130Config::prefixes(\FacturaScripts\Dinamic\Model\Mod130Conf::TIPO_INGRESO);
+        if (null === self::$incomes) {
+            Modelo130Config::ensureDefaults();
+            self::$incomes = Modelo130Config::prefixes(Mod130Conf::TIPO_INGRESO);
+        }
+
+        return self::$incomes;
+    }
+
+    /**
+     * Olvida los prefijos memorizados.
+     *
+     * Debe llamarse al iniciar un cálculo y después de cualquier alta, baja o
+     * restauración de la configuración, para que el cambio se refleje en la
+     * misma petición.
+     */
+    public static function resetCache(): void
+    {
+        self::$expenses = null;
+        self::$incomes = null;
+        self::$withholdingPrefix = self::WITHHOLDING_ACCOUNT;
+    }
+
+    /**
+     * Devuelve el prefijo de la cuenta de retenciones y pagos a cuenta en uso.
+     */
+    public static function withholdingPrefix(): string
+    {
+        return self::$withholdingPrefix;
+    }
+
+    /**
+     * Fija el prefijo de la cuenta de retenciones y pagos a cuenta.
+     *
+     * Permite trabajar con planes contables en los que la cuenta especial IRPF
+     * no es la 473. Un valor vacío restaura el prefijo por defecto.
+     */
+    public static function setWithholdingPrefix(?string $prefix): void
+    {
+        $prefix = trim((string) $prefix);
+
+        self::$withholdingPrefix = $prefix === ''
+            ? self::WITHHOLDING_ACCOUNT
+            : $prefix;
     }
 
     /**
@@ -79,8 +166,8 @@ final class Modelo130Accounts
     /**
      * Comprueba si una subcuenta debe considerarse gasto.
      *
-     * No incluye las cuentas 61 y 71, que deben procesarse con los métodos
-     * stockVariationExpense() y stockVariationIncome().
+     * No incluye las cuentas 61 y 71, cuya clasificación depende del saldo
+     * acumulado del período y se resuelve en Modelo130::loadAccountingData().
      */
     public static function isExpense(string $code): bool
     {
@@ -96,8 +183,8 @@ final class Modelo130Accounts
     /**
      * Comprueba si una subcuenta debe considerarse ingreso.
      *
-     * No incluye las cuentas 61 y 71, que deben procesarse con los métodos
-     * stockVariationExpense() y stockVariationIncome().
+     * No incluye las cuentas 61 y 71, cuya clasificación depende del saldo
+     * acumulado del período y se resuelve en Modelo130::loadAccountingData().
      */
     public static function isIncome(string $code): bool
     {
@@ -122,39 +209,14 @@ final class Modelo130Accounts
     }
 
     /**
-     * Devuelve la parte de una variación de existencias que debe computarse
-     * como gasto.
-     *
-     * Los importes deben ser los acumulados desde el 1 de enero.
-     */
-    public static function stockVariationExpense(
-        float $debit,
-        float $credit
-    ): float {
-        return max($debit - $credit, 0.0);
-    }
-
-    /**
-     * Devuelve la parte de una variación de existencias que debe computarse
-     * como ingreso.
-     *
-     * Los importes deben ser los acumulados desde el 1 de enero.
-     */
-    public static function stockVariationIncome(
-        float $debit,
-        float $credit
-    ): float {
-        return max($credit - $debit, 0.0);
-    }
-
-    /**
-     * Comprueba si una subcuenta pertenece a la cuenta 473.
+     * Comprueba si una subcuenta pertenece a la cuenta de retenciones y pagos
+     * a cuenta (473 salvo que el plan contable indique otra).
      */
     public static function isWithholding(string $code): bool
     {
         return str_starts_with(
             trim($code),
-            static::WITHHOLDING_ACCOUNT
+            static::withholdingPrefix()
         );
     }
 
@@ -171,7 +233,7 @@ final class Modelo130Accounts
         return array_values(array_unique(array_merge(
             static::expenses(),
             static::incomes(),
-            [static::WITHHOLDING_ACCOUNT]
+            [static::withholdingPrefix()]
         )));
     }
 

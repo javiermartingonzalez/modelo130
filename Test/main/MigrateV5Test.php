@@ -21,7 +21,17 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\DataBase;
+use FacturaScripts\Core\DbUpdater;
+use FacturaScripts\Core\Migrations;
+use FacturaScripts\Core\Tools;
+use FacturaScripts\Core\Where;
+use FacturaScripts\Dinamic\Model\Asiento;
+use FacturaScripts\Dinamic\Model\Ejercicio;
 use FacturaScripts\Dinamic\Model\Mod130Conf;
+use FacturaScripts\Dinamic\Model\Partida;
+use FacturaScripts\Dinamic\Model\Subcuenta;
+use FacturaScripts\Plugins\Modelo130\Lib\Modelo130;
+use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Accounts;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
 use FacturaScripts\Plugins\Modelo130\Migration\MigrateV5;
 use FacturaScripts\Test\Traits\DefaultSettingsTrait;
@@ -72,8 +82,9 @@ final class MigrateV5Test extends TestCase
     }
 
     /**
-     * Con solo las subcuentas por defecto de la v4, se elimina la tabla antigua
-     * y se mantiene la configuración para que ensureDefaults la rellene.
+     * Con solo las subcuentas por defecto de la v4 no hay personalización que
+     * conservar: se elimina la tabla antigua y la configuración queda vacía
+     * para que ensureDefaults() la rellene con los valores actuales.
      */
     public function testMigrationWithOnlyLegacyDefaults(): void
     {
@@ -100,7 +111,7 @@ final class MigrateV5Test extends TestCase
         if ($this->db()->tableExists(Mod130Conf::tableName())) {
             $this->db()->exec('DROP TABLE ' . Mod130Conf::tableName());
         }
-        \FacturaScripts\Core\DbUpdater::rebuild();
+        DbUpdater::rebuild();
 
         $this->createLegacyTable();
         $this->insertLegacyRow('4730000000', 'deducible');
@@ -121,34 +132,171 @@ final class MigrateV5Test extends TestCase
 
 
     /**
-     * Actualiza el concepto antiguo de los asientos al nuevo formato.
+     * Los asientos de liquidación de versiones anteriores se renombran y pasan
+     * a llevar el identificador del trimestre en el campo documento.
      */
     public function testMigrationUpdatesAsientoConcept(): void
     {
-        $ejercicios = $this->db()->select(
-            'SELECT idempresa, codejercicio, fechainicio FROM ejercicios LIMIT 1'
+        $asiento = $this->createLegacyPaymentEntry(true);
+
+        (new MigrateV5())->run();
+
+        $updated = new Asiento();
+        $this->assertTrue($updated->load($asiento->idasiento));
+        $this->assertSame('Pago fraccionado IRPF T1', $updated->concepto);
+        $this->assertSame(Modelo130::entryDocument('T1'), $updated->documento);
+
+        $this->assertTrue($updated->delete());
+    }
+
+    /**
+     * Un asiento con el mismo concepto pero sin ninguna partida en la cuenta de
+     * retenciones no pertenece al plugin y no debe modificarse.
+     */
+    public function testMigrationIgnoresUnrelatedEntries(): void
+    {
+        $asiento = $this->createLegacyPaymentEntry(false);
+
+        (new MigrateV5())->run();
+
+        $updated = new Asiento();
+        $this->assertTrue($updated->load($asiento->idasiento));
+        $this->assertSame(
+            'Regularización de IRPF T1',
+            $updated->concepto,
+            'No debe tocarse un asiento ajeno al plugin'
         );
+        $this->assertEmpty($updated->documento);
+
+        $this->assertTrue($updated->delete());
+    }
+
+    /**
+     * La migración solo debe ejecutarse una vez: al lanzarla por el registro de
+     * migraciones, la segunda llamada no vuelve a tocar nada.
+     */
+    public function testMigrationRunsOnlyOnce(): void
+    {
+        $this->forgetMigration();
+
+        $this->createLegacyTable();
+        $this->insertLegacyRow('6210000000', 'deducible');
+
+        Migrations::runPluginMigration(new MigrateV5());
+        $this->assertFalse($this->db()->tableExists(self::LEGACY_TABLE));
+
+        // volvemos a crear la tabla antigua: la migración ya no debe correr
+        $this->createLegacyTable();
+        $this->insertLegacyRow('6220000000', 'deducible');
+
+        Migrations::runPluginMigration(new MigrateV5());
+        $this->assertTrue(
+            $this->db()->tableExists(self::LEGACY_TABLE),
+            'La migración no debe repetirse una segunda vez'
+        );
+    }
+
+    /**
+     * Una subcuenta legacy genérica se convierte en un prefijo demasiado amplio
+     * (6 o 7), así que debe descartarse y dejar solo los prefijos generales.
+     */
+    public function testMigrationDiscardsTooWidePrefixes(): void
+    {
+        if ($this->db()->tableExists(Mod130Conf::tableName())) {
+            $this->db()->exec('DROP TABLE ' . Mod130Conf::tableName());
+        }
+        DbUpdater::rebuild();
+
+        $this->createLegacyTable();
+        $this->insertLegacyRow('6000000000', 'deducible');
+        $this->insertLegacyRow('7000000000', 'ingreso');
+        $this->insertLegacyRow('6420000000', 'deducible');
+        $this->insertLegacyRow('4730000000', 'deducible');
+        $this->insertLegacyRow('6210000000', 'desconocido');
+
+        (new MigrateV5())->run();
+
+        $this->assertSame(
+            [
+                Mod130Conf::TIPO_GASTO => ['60', '642'],
+                Mod130Conf::TIPO_INGRESO => ['70'],
+            ],
+            $this->currentRules()
+        );
+    }
+
+    /**
+     * Elimina la marca de migración ejecutada del registro de MyFiles, para que
+     * la prueba no dependa de ejecuciones anteriores.
+     */
+    private function forgetMigration(): void
+    {
+        $file = Tools::folder('MyFiles', 'migrations.json');
+
+        if (false === file_exists($file)) {
+            return;
+        }
+
+        $executed = json_decode((string)file_get_contents($file), true);
+
+        if (false === is_array($executed)) {
+            return;
+        }
+
+        $name = MigrateV5::getFullMigrationName();
+        $executed = array_values(array_filter(
+            $executed,
+            function ($item) use ($name) {
+                return $item !== $name;
+            }
+        ));
+
+        file_put_contents($file, json_encode($executed, JSON_PRETTY_PRINT));
+    }
+
+    /**
+     * Crea un asiento con el concepto antiguo del plugin, con o sin partida en
+     * la cuenta de retenciones.
+     */
+    private function createLegacyPaymentEntry(bool $withWithholding): Asiento
+    {
+        $ejercicios = (new Ejercicio())->all([], ['codejercicio' => 'DESC'], 0, 1);
         $this->assertNotEmpty($ejercicios);
 
-        $asiento = new \FacturaScripts\Dinamic\Model\Asiento();
-        $asiento->idempresa = $ejercicios[0]['idempresa'];
-        $asiento->codejercicio = $ejercicios[0]['codejercicio'];
+        $ejercicio = $ejercicios[0];
+
+        $asiento = new Asiento();
+        $asiento->idempresa = $ejercicio->idempresa;
+        $asiento->codejercicio = $ejercicio->codejercicio;
         $asiento->concepto = 'Regularización de IRPF T1';
-        $asiento->fecha = $ejercicios[0]['fechainicio'];
+        $asiento->fecha = $ejercicio->fechainicio;
         $asiento->importe = 100.0;
 
         $this->assertTrue($asiento->save());
 
-        (new MigrateV5())->run();
+        if (false === $withWithholding) {
+            return $asiento;
+        }
 
-        $updated = new \FacturaScripts\Dinamic\Model\Asiento();
-        $this->assertTrue($updated->load($asiento->idasiento));
-        $this->assertSame(
-            'Pago fraccionado IRPF T1',
-            $updated->concepto
-        );
+        $subcuenta = new Subcuenta();
+        $found = $subcuenta->loadWhere([
+            Where::eq('codejercicio', $ejercicio->codejercicio),
+            Where::like('codsubcuenta', Modelo130Accounts::WITHHOLDING_ACCOUNT . '%'),
+        ]);
 
-        $this->assertTrue($updated->delete());
+        if (false === $found) {
+            $this->markTestSkipped('El plan contable no tiene la cuenta de retenciones.');
+        }
+
+        $partida = new Partida();
+        $partida->idasiento = $asiento->idasiento;
+        $partida->codsubcuenta = $subcuenta->codsubcuenta;
+        $partida->concepto = $asiento->concepto;
+        $partida->debe = 100.0;
+
+        $this->assertTrue($partida->save());
+
+        return $asiento;
     }
 
     /**

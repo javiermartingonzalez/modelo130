@@ -76,12 +76,16 @@ final class Modelo130Test extends TestCase
             'accountingEntries',
             'currentPaymentEntry',
             'currentPaymentEntryExists',
+            'unaccountedSales',
+            'unaccountedPurchases',
+            'limiteGastosJustificacion',
             'applyGastosJustificacion',
             'todeduct',
             'gastosJustificacionPct',
             'taxbaseIngresos',
             'taxbaseRetenciones',
             'taxbaseGastos',
+            'taxbaseGastosTotal',
             'taxbase',
             'gastosJustificacion',
             'afterdeduct',
@@ -124,9 +128,10 @@ final class Modelo130Test extends TestCase
         $codejercicio = $ejercicio->codejercicio;
         $idempresa = $ejercicio->idempresa;
 
-        // obtener una forma de pago existente, o usar 0 si no hay ninguna
+        // obtener una forma de pago existente; el identificador es codpago
         $formasPago = (new FormaPago())->all([], [], 0, 1);
-        $paymentMethodId = empty($formasPago) ? null : $formasPago[0]->id();
+        $paymentMethodId = empty($formasPago) ? null : (string)$formasPago[0]->codpago;
+        $this->assertNotSame('0', $paymentMethodId, 'codpago no es un entero');
 
         $periodo = 'T1';
         $importe = 100.0;
@@ -147,6 +152,13 @@ final class Modelo130Test extends TestCase
 
         $this->assertTrue($encontrado, 'El asiento debe existir en la base de datos tras generateEntries()');
         $this->assertEquals($importe, $asiento->importe, 'El importe del asiento debe ser 100.0');
+
+        // el asiento se marca con un documento independiente del idioma
+        $this->assertSame(
+            Modelo130::entryDocument($periodo),
+            $asiento->documento,
+            'El asiento debe llevar el identificador del trimestre en documento'
+        );
 
         // comprobar que el asiento contiene las dos partidas esperadas
         $partidas = (new Partida())->all([
@@ -250,6 +262,53 @@ final class Modelo130Test extends TestCase
 
         // redondeo a 2 decimales
         $this->assertSame(33.33, Modelo130::calcFractionalPayment(100.005, 33.33, 33.345));
+    }
+
+    /**
+     * La casilla 05 nunca puede ser negativa, aunque la cuenta de retenciones
+     * quede con saldo acreedor sin factura asociada. El fichero de la AEAT
+     * aplica el mismo tope, así que pantalla y fichero deben coincidir.
+     */
+    public function testPreviousPaymentsAreNeverNegative(): void
+    {
+        $ejercicios = (new Ejercicio())->all([], ['codejercicio' => 'DESC'], 0, 1);
+        $this->assertNotEmpty($ejercicios, 'No hay ningún ejercicio en la base de datos');
+
+        $resultado = Modelo130::generate($ejercicios[0]->codejercicio, 'T4');
+
+        $this->assertGreaterThanOrEqual(0.0, $resultado['positivosTrimestres']);
+    }
+
+    /**
+     * La casilla 02 que se envía a la AEAT incluye los gastos de difícil
+     * justificación, por lo que el cálculo debe exponerla ya sumada.
+     */
+    public function testExpensesTotalIncludesGastosJustificacion(): void
+    {
+        $ejercicios = (new Ejercicio())->all([], ['codejercicio' => 'DESC'], 0, 1);
+        $this->assertNotEmpty($ejercicios, 'No hay ningún ejercicio en la base de datos');
+
+        $resultado = Modelo130::generate($ejercicios[0]->codejercicio, 'T4', true);
+
+        $this->assertSame(
+            round(
+                $resultado['taxbaseGastos'] + $resultado['gastosJustificacion'],
+                2
+            ),
+            $resultado['taxbaseGastosTotal']
+        );
+    }
+
+    /**
+     * entryDocument() normaliza el período y siempre devuelve un identificador
+     * válido, aunque le llegue un valor inesperado.
+     */
+    public function testEntryDocument(): void
+    {
+        $this->assertSame('M130-T1', Modelo130::entryDocument('T1'));
+        $this->assertSame('M130-T4', Modelo130::entryDocument('t4'));
+        $this->assertSame('M130-T2', Modelo130::entryDocument(' T2 '));
+        $this->assertSame('M130-T1', Modelo130::entryDocument('trimestre'));
     }
 
     /**

@@ -1,4 +1,21 @@
 <?php
+/**
+ * This file is part of Modelo130 plugin for FacturaScripts
+ * Copyright (C) 2026 Carlos Garcia Gomez <carlos@facturascripts.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 namespace FacturaScripts\Plugins\Modelo130\Lib;
 
@@ -7,6 +24,14 @@ use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Cuenta;
 use FacturaScripts\Dinamic\Model\Mod130Conf;
 
+/**
+ * Gestiona la configuración de prefijos contables del Modelo 130: reglas
+ * guardadas en Mod130Conf, valores predeterminados según el plan contable
+ * instalado y validaciones de solapamiento entre reglas.
+ *
+ * @author Javier Martín González       <javier@javiermarting.es>
+ * @author Daniel Fernández Giménez     <contacto@danielfg.es>
+ */
 class Modelo130Config
 {
     /**
@@ -54,6 +79,21 @@ class Modelo130Config
         ],
     ];
 
+    /**
+     * Listado de cuentas del plan contable memorizado, indexado por código.
+     *
+     * description() se llama una vez por regla al pintar la configuración, así
+     * que sin memorizar recorrería la tabla de cuentas decenas de veces.
+     *
+     * @var array<string, string>|null
+     */
+    private static $accountsCache = null;
+
+    /**
+     * Devuelve las reglas guardadas del tipo indicado, ordenadas por código.
+     *
+     * @return Mod130Conf[]
+     */
     public static function rules(string $type): array
     {
         if (!in_array(
@@ -72,6 +112,14 @@ class Modelo130Config
         );
     }
 
+    /**
+     * Devuelve los prefijos contables válidos del tipo indicado.
+     *
+     * Descarta las reglas cuyo código no corresponde con su tipo (gastos que no
+     * empiezan por 6 o ingresos que no empiezan por 7).
+     *
+     * @return string[]
+     */
     public static function prefixes(string $type): array
     {
         $result = [];
@@ -85,6 +133,9 @@ class Modelo130Config
         return array_values(array_unique($result));
     }
 
+    /**
+     * Carga la configuración predeterminada si todavía no hay ninguna regla.
+     */
     public static function ensureDefaults(): void
     {
         if ((new Mod130Conf())->count() === 0) {
@@ -92,6 +143,10 @@ class Modelo130Config
         }
     }
 
+    /**
+     * Borra la configuración actual y la reconstruye desde el plan contable
+     * instalado.
+     */
     public static function restoreDefaults(): bool
     {
         foreach ((new Mod130Conf())->all([], [], 0, 0) as $rule) {
@@ -115,6 +170,12 @@ class Modelo130Config
         return true;
     }
 
+    /**
+     * Construye las reglas predeterminadas que tienen sentido en el plan
+     * contable instalado.
+     *
+     * @return array<string, string[]>
+     */
     public static function buildDefaultRules(): array
     {
         $available = self::availableAccounts();
@@ -147,35 +208,44 @@ class Modelo130Config
         return $result;
     }
 
+    /**
+     * Devuelve el texto descriptivo de un prefijo para mostrarlo en la
+     * configuración: la descripción de la cuenta cuando existe exactamente, un
+     * aviso de que actúa como prefijo cuando solo hay cuentas hijas, o un aviso
+     * de que no existe en el plan contable actual.
+     */
     public static function description(string $code): string
     {
         $code = trim($code);
+        $available = self::availableAccounts();
 
-        $account = new Cuenta();
-
-        if ($account->loadWhere([Where::eq('codcuenta', $code)])) {
-            return (string) $account->descripcion;
+        if (isset($available[$code])) {
+            return $available[$code];
         }
 
         /*
          * Las reglas pueden no corresponder con una cuenta exacta, pero sí
          * actuar como prefijo de cuentas hijas.
          */
-        foreach ((new Cuenta())->all([], ['codcuenta' => 'ASC'], 0, 0) as $candidate) {
-            if (str_starts_with((string) $candidate->codcuenta, $code)) {
-                return Tools::lang()->trans(
-                    'model-130-prefix-includes',
-                    ['%code%' => $code]
-                );
-            }
+        if (self::prefixExists($code, $available)) {
+            return Tools::trans(
+                'model-130-prefix-includes',
+                ['%code%' => $code]
+            );
         }
 
-        return Tools::lang()->trans(
+        return Tools::trans(
             'model-130-prefix-not-found',
             ['%code%' => $code]
         );
     }
 
+    /**
+     * Comprueba si un código engloba a una regla existente o queda englobado
+     * por ella, para no contabilizar dos veces la misma cuenta.
+     *
+     * @param int|null $excludeId regla que no debe considerarse (al editar)
+     */
     public static function hasOverlap(string $code, ?int $excludeId = null): bool
     {
         $code = trim($code);
@@ -207,6 +277,10 @@ class Modelo130Config
      */
     private static function availableAccounts(): array
     {
+        if (null !== self::$accountsCache) {
+            return self::$accountsCache;
+        }
+
         $result = [];
 
         foreach ((new Cuenta())->all([], ['codcuenta' => 'ASC'], 0, 0) as $account) {
@@ -219,7 +293,17 @@ class Modelo130Config
             $result[$code] = (string) $account->descripcion;
         }
 
+        self::$accountsCache = $result;
+
         return $result;
+    }
+
+    /**
+     * Olvida el listado de cuentas memorizado.
+     */
+    public static function resetCache(): void
+    {
+        self::$accountsCache = null;
     }
 
     /**

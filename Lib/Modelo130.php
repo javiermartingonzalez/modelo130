@@ -21,11 +21,11 @@ namespace FacturaScripts\Plugins\Modelo130\Lib;
 use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
+use FacturaScripts\Dinamic\Lib\Accounting\AccountingAccounts;
 use FacturaScripts\Dinamic\Model\Asiento;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 use FacturaScripts\Dinamic\Model\FacturaCliente;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
-use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Partida;
 
 /**
@@ -39,6 +39,27 @@ class Modelo130
      * (art. 30.2.4ª LIRPF).
      */
     const LIMITE_GASTOS_JUSTIFICACION = 2000.0;
+
+    /**
+     * Prefijo del campo documento de los asientos de liquidación creados por
+     * el plugin.
+     *
+     * Identifica el asiento del trimestre sin depender del idioma del usuario,
+     * ya que el concepto es traducible y puede cambiar entre sesiones.
+     */
+    const ENTRY_DOCUMENT_PREFIX = 'M130-';
+
+    /**
+     * Número máximo de identificadores por consulta al cargar asientos y
+     * facturas en bloque, para no generar sentencias IN() desmesuradas.
+     */
+    const ID_BATCH_SIZE = 500;
+
+    /**
+     * Cuenta especial usada como contrapartida del pago cuando la forma de pago
+     * elegida no tiene cuenta bancaria asignada.
+     */
+    const BANK_SPECIAL_ACCOUNT = 'BANCO';
 
     /**
      * Partidas contables que intervienen en el cálculo y que no están
@@ -105,6 +126,12 @@ class Modelo130
     /** @var Asiento|null */
     protected static $currentPaymentEntry;
 
+    /** @var int Facturas de cliente del período sin asiento contable. */
+    protected static $unaccountedSales = 0;
+
+    /** @var int Facturas de proveedor del período sin asiento contable. */
+    protected static $unaccountedPurchases = 0;
+
     public static function generate(
         string $codejercicio,
         string $period,
@@ -129,9 +156,18 @@ class Modelo130
         static::$taxbaseRetentions = 0.0;
         static::$previousPayments = 0.0;
         static::$currentPaymentEntry = null;
+        static::$unaccountedSales = 0;
+        static::$unaccountedPurchases = 0;
+
+        // la configuración de cuentas se lee una única vez por cálculo
+        Modelo130Accounts::resetCache();
+        Modelo130Accounts::setWithholdingPrefix(
+            static::resolveWithholdingPrefix($codejercicio)
+        );
 
         static::loadDates();
         static::loadAccountingData();
+        static::loadUnaccountedInvoices();
 
         $results = static::loadResults(
             $applyGastosJustificacion,
@@ -148,6 +184,9 @@ class Modelo130
             'accountingEntries' => static::$accountingEntries,
             'currentPaymentEntry' => static::$currentPaymentEntry,
             'currentPaymentEntryExists' => null !== static::$currentPaymentEntry,
+            'unaccountedSales' => static::$unaccountedSales,
+            'unaccountedPurchases' => static::$unaccountedPurchases,
+            'limiteGastosJustificacion' => static::LIMITE_GASTOS_JUSTIFICACION,
             'applyGastosJustificacion' => $applyGastosJustificacion,
             'todeduct' => $todeduct,
             'gastosJustificacionPct' => $gastosJustificacionPct,
@@ -168,11 +207,24 @@ class Modelo130
             ['%period%' => $period]
         );
 
-        // si ya existe un asiento igual, no lo creamos
-        if ($asiento->loadWhere([
+        $documento = static::entryDocument($period);
+
+        /**
+         * Si ya existe el asiento del mismo trimestre, no lo creamos.
+         *
+         * Se busca primero por el campo documento, que no depende del idioma,
+         * y después por el concepto, para reconocer también los asientos
+         * creados con versiones anteriores del plugin.
+         */
+        $exists = $asiento->loadWhere([
+            Where::eq('codejercicio', $codejercicio),
+            Where::eq('documento', $documento),
+        ]) || $asiento->loadWhere([
             Where::eq('codejercicio', $codejercicio),
             Where::eq('concepto', $concepto),
-        ])) {
+        ]);
+
+        if ($exists) {
             Tools::log()->warning('exists-accounting-130', [
                 '%codejercicio%' => $codejercicio,
                 '%concepto%' => $concepto,
@@ -184,6 +236,7 @@ class Modelo130
         $asiento->idempresa = $idempresa;
         $asiento->codejercicio = $codejercicio;
         $asiento->concepto = $concepto;
+        $asiento->documento = $documento;
         $asiento->fecha = $date;
         $asiento->importe = $amount;
 
@@ -191,31 +244,43 @@ class Modelo130
             return false;
         }
 
+        $accounts = new AccountingAccounts();
+        $accounts->exercise->load($codejercicio);
+
+        // subcuenta de Hacienda pública, retenciones y pagos a cuenta
+        $withholding = $accounts->getSpecialSubAccount(
+            AccountingAccounts::SPECIAL_IRPF_SALES_ACCOUNT
+        );
+
         $partida1 = new Partida();
         $partida1->idasiento = $asiento->idasiento;
         $partida1->concepto = Tools::trans('acc-concept-irpf-130-lines');
         $partida1->debe = $amount;
-        $partida1->codsubcuenta = '4730000000';
+        $partida1->codsubcuenta = empty($withholding->codsubcuenta)
+            ? '4730000000'
+            : $withholding->codsubcuenta;
 
         if (false === $partida1->save()) {
             $asiento->delete();
             return false;
         }
 
-        $bankAccount = null;
-        $paymentMethod = new FormaPago();
-
-        if ($paymentMethod->load($paymentMethodId)) {
-            $bankAccount = $paymentMethod->getBankAccount();
-        }
+        /**
+         * Contrapartida: la cuenta bancaria de la forma de pago elegida y, si
+         * no tiene ninguna, la cuenta marcada como especial de bancos.
+         */
+        $payment = $accounts->getPaymentAccount(
+            (string)$paymentMethodId,
+            static::BANK_SPECIAL_ACCOUNT
+        );
 
         $partida2 = new Partida();
         $partida2->idasiento = $asiento->idasiento;
         $partida2->concepto = Tools::trans('acc-concept-irpf-130-lines');
         $partida2->haber = $amount;
-        $partida2->codsubcuenta = !empty($bankAccount->codsubcuenta)
-            ? $bankAccount->codsubcuenta
-            : '5720000000';
+        $partida2->codsubcuenta = empty($payment->codsubcuenta)
+            ? '5720000000'
+            : $payment->codsubcuenta;
 
         if (false === $partida2->save()) {
             $asiento->delete();
@@ -279,9 +344,12 @@ class Modelo130
 
 
     /**
-     * Calcula el pago fraccionado previo del trimestre (casilla 07) 
-     * restando retenciones e ingresos de trimestres anteriores.
-     * Si el resultado es negativo, el pago fraccionado no puede ser negativo.
+     * Calcula la casilla 07 restando de la casilla 04 los pagos fraccionados de
+     * trimestres anteriores (casilla 05) y las retenciones soportadas
+     * (casilla 06).
+     *
+     * Puede ser negativa: es el resultado parcial del trimestre. El tope a cero
+     * se aplica en la casilla 19 mediante calcResult().
      */
     public static function calcFractionalPayment(
         float $afterdeduct,
@@ -296,13 +364,93 @@ class Modelo130
         );
     }
 
-     /**
-     * Calcula el resultado final del modelo (casilla 19) en base al pago fraccionado previo.
-     * Si el resultado es negativo, el resultado final no puede ser negativo.
+    /**
+     * Calcula el resultado final del modelo (casilla 19) a partir de la
+     * casilla 07. Si el resultado parcial es negativo, la casilla 19 es cero.
      */
     public static function calcResult(float $fractionalPayment): float
     {
         return max(0.0, $fractionalPayment);
+    }
+
+    /**
+     * Devuelve el valor del campo documento que identifica al asiento de
+     * liquidación de un trimestre.
+     *
+     * Es independiente del idioma, a diferencia del concepto.
+     */
+    public static function entryDocument(string $period): string
+    {
+        $period = strtoupper(trim($period));
+
+        if (false === in_array($period, ['T1', 'T2', 'T3', 'T4'], true)) {
+            $period = 'T1';
+        }
+
+        return static::ENTRY_DOCUMENT_PREFIX . $period;
+    }
+
+    /**
+     * Devuelve el prefijo de la cuenta de retenciones y pagos a cuenta del
+     * ejercicio indicado.
+     *
+     * Se obtiene de la cuenta marcada como especial IRPF en el plan contable,
+     * de forma que el cálculo también funcione con planes personalizados. Si no
+     * hay ninguna marcada, se usa la 473 del plan general español.
+     */
+    public static function resolveWithholdingPrefix(string $codejercicio): string
+    {
+        $accounts = new AccountingAccounts();
+
+        if (false === $accounts->exercise->load($codejercicio)) {
+            return Modelo130Accounts::WITHHOLDING_ACCOUNT;
+        }
+
+        $account = $accounts->getSpecialAccount(
+            AccountingAccounts::SPECIAL_IRPF_SALES_ACCOUNT
+        );
+
+        $code = trim((string)$account->codcuenta);
+
+        return $code === ''
+            ? Modelo130Accounts::WITHHOLDING_ACCOUNT
+            : $code;
+    }
+
+    /**
+     * Cuenta las facturas del período que no tienen asiento contable.
+     *
+     * Como el cálculo se hace sobre partidas, una factura sin contabilizar no
+     * computa. Se informa del número para que el usuario pueda revisarlas antes
+     * de presentar la declaración.
+     */
+    protected static function loadUnaccountedInvoices(): void
+    {
+        $where = [
+            Where::gte('fecha', date('Y-m-d', strtotime(static::$dateStart))),
+            Where::lte('fecha', date('Y-m-d', strtotime(static::$dateEnd))),
+            Where::isNull('idasiento'),
+        ];
+
+        if (null !== static::$idempresa) {
+            $where[] = Where::eq('idempresa', static::$idempresa);
+        }
+
+        static::$unaccountedSales = FacturaCliente::count($where);
+        static::$unaccountedPurchases = FacturaProveedor::count($where);
+    }
+
+    /**
+     * Parte una lista de identificadores en lotes del tamaño máximo admitido.
+     *
+     * @param int[] $entryIds
+     * @return array<int, int[]>
+     */
+    protected static function idBatches(array $entryIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $entryIds)));
+
+        return array_chunk($ids, static::ID_BATCH_SIZE);
     }
 
     protected static function getSqlValueCondition(
@@ -562,6 +710,8 @@ class Modelo130
             'acc-concept-irpf-130',
             ['%period%' => static::$period]
         );
+
+        $currentPaymentDocument = static::entryDocument(static::$period);
     
         foreach ($groups as $idasiento => $group) {
             $entry = $accountingEntries[$idasiento] ?? null;
@@ -570,7 +720,13 @@ class Modelo130
                 continue;
             }
 
-            $isCurrentPaymentEntry = $entry->concepto === $currentPaymentConcept;
+            /**
+             * El asiento de liquidación del propio trimestre se identifica por
+             * el campo documento y, como respaldo para los asientos creados con
+             * versiones anteriores, por el concepto traducido.
+             */
+            $isCurrentPaymentEntry = $entry->documento === $currentPaymentDocument
+                || $entry->concepto === $currentPaymentConcept;
             if ($isCurrentPaymentEntry) {
                 static::$currentPaymentEntry = $entry;
             }
@@ -762,6 +918,12 @@ class Modelo130
                 break;
         }
 
+        /**
+         * El modelo se declara siempre por año natural, por eso la consulta de
+         * partidas filtra por fecha e idempresa pero NO por codejercicio: en
+         * ejercicios no naturales también deben computarse los asientos del
+         * ejercicio contiguo que caen dentro del mismo año.
+         */
         static::$idempresa = static::$exercise->idempresa;
     }
 
@@ -779,20 +941,16 @@ class Modelo130
         }
 
         $result = [];
-        $ids = implode(
-            ',',
-            array_map('intval', $entryIds)
-        );
+        $model = new Asiento();
 
-        $where = [
-            Where::in('idasiento', $ids),
-        ];
+        foreach (static::idBatches($entryIds) as $batch) {
+            $where = [
+                Where::in('idasiento', implode(',', $batch)),
+            ];
 
-        foreach (
-            (new Asiento())->all($where, [], 0, 0)
-            as $entry
-        ) {
-            $result[(int)$entry->idasiento] = $entry;
+            foreach ($model->all($where, [], 0, 0) as $entry) {
+                $result[(int)$entry->idasiento] = $entry;
+            }
         }
 
         return $result;
@@ -815,24 +973,19 @@ class Modelo130
         }
 
         $result = [];
-        $ids = implode(
-            ',',
-            array_map('intval', $entryIds)
-        );
 
-        $where = [
-            Where::in('idasiento', $ids),
-        ];
+        foreach (static::idBatches($entryIds) as $batch) {
+            $where = [
+                Where::in('idasiento', implode(',', $batch)),
+            ];
 
-        foreach (
-            $model->all($where, [], 0, 0)
-            as $invoice
-        ) {
-            if (empty($invoice->idasiento)) {
-                continue;
+            foreach ($model->all($where, [], 0, 0) as $invoice) {
+                if (empty($invoice->idasiento)) {
+                    continue;
+                }
+
+                $result[(int)$invoice->idasiento] = $invoice;
             }
-
-            $result[(int)$invoice->idasiento] = $invoice;
         }
 
         return $result;
@@ -861,10 +1014,20 @@ class Modelo130
             $todeduct
         );
 
+        /**
+         * La casilla 05 no puede ser negativa: un abono en la cuenta de
+         * retenciones sin factura asociada (por ejemplo una devolución de
+         * Hacienda) no puede incrementar el pago fraccionado del trimestre.
+         *
+         * El fichero de la AEAT aplica ese mismo tope, así que se unifica aquí
+         * para que la casilla 07 de la pantalla y la del fichero coincidan.
+         */
+        $previousPayments = max(0.0, static::$previousPayments);
+
         $fractionalPayment = static::calcFractionalPayment(
             $afterdeduct,
             static::$taxbaseRetentions,
-            static::$previousPayments
+            $previousPayments
         );
 
         $result = static::calcResult($fractionalPayment);
@@ -873,10 +1036,14 @@ class Modelo130
             'taxbaseIngresos' => static::$taxbaseIncomes,
             'taxbaseRetenciones' => static::$taxbaseRetentions,
             'taxbaseGastos' => static::$taxbaseExpenses,
+            'taxbaseGastosTotal' => round(
+                static::$taxbaseExpenses + $gastosJustificacion,
+                2
+            ),
             'taxbase' => $taxbase,
             'gastosJustificacion' => $gastosJustificacion,
             'afterdeduct' => $afterdeduct,
-            'positivosTrimestres' => static::$previousPayments,
+            'positivosTrimestres' => $previousPayments,
             'fractionalPayment' => $fractionalPayment,
             'result' => $result,
         ];
