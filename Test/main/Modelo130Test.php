@@ -24,6 +24,7 @@ use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Asiento;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 use FacturaScripts\Dinamic\Model\FormaPago;
+use FacturaScripts\Dinamic\Model\Partida;
 use FacturaScripts\Plugins\Modelo130\Lib\Modelo130;
 use FacturaScripts\Test\Traits\DefaultSettingsTrait;
 use FacturaScripts\Test\Traits\LogErrorsTrait;
@@ -70,10 +71,11 @@ final class Modelo130Test extends TestCase
             'exercise',
             'period',
             'idempresa',
-            'customerInvoices',
-            'supplierInvoices',
+            'sales',
+            'purchases',
             'accountingEntries',
-            'incomeEntries',
+            'currentPaymentEntry',
+            'currentPaymentEntryExists',
             'applyGastosJustificacion',
             'todeduct',
             'gastosJustificacionPct',
@@ -84,6 +86,7 @@ final class Modelo130Test extends TestCase
             'gastosJustificacion',
             'afterdeduct',
             'positivosTrimestres',
+            'fractionalPayment',
             'result',
         ];
 
@@ -94,6 +97,9 @@ final class Modelo130Test extends TestCase
         // verificar tipos concretos de las claves principales
         $this->assertInstanceOf(Ejercicio::class, $resultado['exercise'], 'exercise debe ser una instancia de Ejercicio');
         $this->assertSame('T1', $resultado['period'], 'El periodo debe ser T1');
+        $this->assertIsArray($resultado['sales'], 'sales debe ser un array');
+        $this->assertIsArray($resultado['purchases'], 'purchases debe ser un array');
+        $this->assertIsArray($resultado['accountingEntries'], 'accountingEntries debe ser un array');
 
         // comprobar que el ejercicio cargado es el correcto
         $this->assertSame($codejercicio, $resultado['exercise']->codejercicio, 'El ejercicio debe coincidir con el solicitado');
@@ -124,7 +130,8 @@ final class Modelo130Test extends TestCase
 
         $periodo = 'T1';
         $importe = 100.0;
-        $fecha = date('Y-m-d');
+        $year = date('Y', strtotime($ejercicio->fechainicio));
+        $fecha = $year . '-03-31';
 
         // la primera llamada debe crear el asiento correctamente
         $creado = Modelo130::generateEntries($idempresa, $codejercicio, $periodo, $fecha, $importe, $paymentMethodId);
@@ -141,6 +148,28 @@ final class Modelo130Test extends TestCase
         $this->assertTrue($encontrado, 'El asiento debe existir en la base de datos tras generateEntries()');
         $this->assertEquals($importe, $asiento->importe, 'El importe del asiento debe ser 100.0');
 
+        // comprobar que el asiento contiene las dos partidas esperadas
+        $partidas = (new Partida())->all([
+            Where::eq('idasiento', $asiento->idasiento),
+        ], ['orden' => 'ASC']);
+
+        $this->assertCount(2, $partidas, 'El asiento debe contener dos partidas');
+        $this->assertSame('4730000000', $partidas[0]->codsubcuenta);
+        $this->assertEquals($importe, $partidas[0]->debe);
+        $this->assertEquals(0.0, (float)$partidas[0]->haber);
+        $this->assertEquals($importe, $partidas[1]->haber);
+
+        // generate() debe devolver el propio asiento para que la interfaz
+        // pueda mostrar un enlace directo cuando ya existe.
+        $resultado = Modelo130::generate($codejercicio, $periodo);
+        $this->assertTrue($resultado['currentPaymentEntryExists']);
+        $this->assertInstanceOf(Asiento::class, $resultado['currentPaymentEntry']);
+        $this->assertSame(
+            (int) $asiento->idasiento,
+            (int) $resultado['currentPaymentEntry']->idasiento
+        );
+        $this->assertNotEmpty($resultado['currentPaymentEntry']->url());
+
         // una segunda llamada con los mismos parámetros debe devolver false (ya existe)
         $duplicado = Modelo130::generateEntries($idempresa, $codejercicio, $periodo, $fecha, $importe, $paymentMethodId);
         $this->assertFalse($duplicado, 'generateEntries() debe devolver false si ya existe el asiento');
@@ -156,29 +185,29 @@ final class Modelo130Test extends TestCase
     public function testCalcGastosJustificacion(): void
     {
         // desactivado: siempre 0 aunque haya base
-        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(10000.0, false, 7.0));
+        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(10000.0, false, 5.0));
 
         // base cero o negativa: 0
-        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(0.0, true, 7.0));
-        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(-500.0, true, 7.0));
+        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(0.0, true, 5.0));
+        $this->assertSame(0.0, Modelo130::calcGastosJustificacion(-500.0, true, 5.0));
 
-        // porcentaje por defecto (7%) sobre una base por debajo del límite
-        $this->assertSame(700.0, Modelo130::calcGastosJustificacion(10000.0, true, 7.0));
-
-        // el 5% anterior sigue siendo posible de forma explícita
+        // porcentaje por defecto (5%) sobre una base por debajo del límite
         $this->assertSame(500.0, Modelo130::calcGastosJustificacion(10000.0, true, 5.0));
 
-        // redondeo a 2 decimales
-        $this->assertSame(70.35, Modelo130::calcGastosJustificacion(1005.0, true, 7.0));
+        // el 5% anterior sigue siendo posible de forma explícita
+        $this->assertSame(700.0, Modelo130::calcGastosJustificacion(10000.0, true, 7.0));
 
-        // tope anual de 2.000 €: 7% de 40.000 = 2.800, pero se limita a 2.000
-        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(40000.0, true, 7.0));
+        // redondeo a 2 decimales
+        $this->assertSame(50.25, Modelo130::calcGastosJustificacion(1005.0, true, 5.0));
+
+        // tope anual de 2.000 €: 5% de 45.000 = 2.250, pero se limita a 2.000
+        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(45000.0, true, 5.0));
 
         // muy por encima del tope: se limita igualmente a 2.000
-        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(100000.0, true, 7.0));
+        $this->assertSame(2000.0, Modelo130::calcGastosJustificacion(100000.0, true, 5.0));
 
-        // justo por debajo del límite (7% de 28.500 = 1.995): no se topa
-        $this->assertSame(1995.0, Modelo130::calcGastosJustificacion(28500.0, true, 7.0));
+        // justo por debajo del límite (5% de 39.900 = 1.995): no se topa
+        $this->assertSame(1995.0, Modelo130::calcGastosJustificacion(39900.0, true, 5.0));
 
         // la constante del límite es la esperada
         $this->assertSame(2000.0, Modelo130::LIMITE_GASTOS_JUSTIFICACION);
@@ -201,26 +230,40 @@ final class Modelo130Test extends TestCase
         $this->assertSame(0.0, Modelo130::calcAfterDeduct(0.0, 0.0, 20.0));
 
         // con gastos de difícil justificación descontados
-        $this->assertSame(1860.0, Modelo130::calcAfterDeduct(10000.0, 700.0, 20.0));
+        $this->assertSame(1900.0, Modelo130::calcAfterDeduct(10000.0, 500.0, 20.0));
     }
 
     /**
      * Verifica que el resultado final nunca es negativo tras descontar
      * retenciones e ingresos de trimestres anteriores.
      */
-    public function testCalcResult(): void
+    public function testCalcFractionalPayment(): void
     {
         // caso normal: 2.000 - 500 - 300 = 1.200
-        $this->assertSame(1200.0, Modelo130::calcResult(2000.0, 500.0, 300.0));
+        $this->assertSame(1200.0, Modelo130::calcFractionalPayment(2000.0, 500.0, 300.0));
 
-        // resultado negativo: la casilla no baja de 0
-        $this->assertSame(0.0, Modelo130::calcResult(500.0, 400.0, 300.0));
+        // resultado negativo
+        $this->assertSame(-200.0, Modelo130::calcFractionalPayment(500.0, 400.0, 300.0));
 
         // resultado exactamente 0
-        $this->assertSame(0.0, Modelo130::calcResult(100.0, 50.0, 50.0));
+        $this->assertSame(0.0, Modelo130::calcFractionalPayment(100.0, 50.0, 50.0));
 
         // redondeo a 2 decimales
-        $this->assertSame(33.33, Modelo130::calcResult(100.005, 33.33, 33.345));
+        $this->assertSame(33.33, Modelo130::calcFractionalPayment(100.005, 33.33, 33.345));
+    }
+
+    /**
+     * Verifica que el resultado final nunca es negativo 
+     * en base al pago fraccionado previo del trimestre.
+     */
+    public function testCalcResult(): void
+    {
+        // caso normal: 1.200
+        $this->assertSame(1200.0, Modelo130::calcResult(1200.0));
+        // resultado negativo: la casilla no baja de 0
+        $this->assertSame(0.0, Modelo130::calcResult(-200.0));
+        // resultado exactamente 0
+        $this->assertSame(0.0, Modelo130::calcResult(0.0));
     }
 
     protected function tearDown(): void

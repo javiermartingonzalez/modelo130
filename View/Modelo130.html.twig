@@ -1,704 +1,581 @@
 {% extends "Master/MenuTemplate.html.twig" %}
 
+
 {% block css %}
-	{{ parent() }}
-	<link rel="stylesheet" href="{{ asset('node_modules/jquery-ui-dist/jquery-ui.min.css') }}"/>
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('node_modules/jquery-ui-dist/jquery-ui.min.css') }}"/>
 {% endblock %}
 
 {% block javascripts %}
-	{{ parent() }}
-	<script src="{{ asset('node_modules/jquery-ui-dist/jquery-ui.min.js') }}"></script>
-	<script>
-		$(document).ready(function () {
-$("#findSubaccount").autocomplete({
-source: function (request, response) {
-$.ajax({
-method: "POST",
-url: '{{ fsc.url() }}',
-data: {
-action: 'autocomplete-subaccount',
-term: request.term
-},
-dataType: "json",
-success: function (results) {
-let values = [];
-results.forEach(function (element) {
-if (element.key === null || element.key === element.value) {
-values.push(element);
-} else {
-values.push({
-key: element.key,
-value: element.key + " | " + element.value
-});
-}
-});
-response(values);
-},
-error: function (msg) {
-alert(msg.status + " " + msg.responseText);
-}
-});
-},
-select: function (event, ui) {
-if (ui.item.key !== null) {
-$('form[name="add-subaccount"] input[name="codsubcuenta"]').val(ui.item.key);
-}
-},
-open: function (event, ui) {
-$(this).autocomplete('widget').css('z-index', 1500);
-return false;
-}
-});
+    {{ parent() }}
+    <script src="{{ asset('node_modules/jquery-ui-dist/jquery-ui.min.js') }}"></script>
+    <script>
+        function initModelo130AccountAutocomplete(inputId, type) {
+            const input = $('#' + inputId);
+            input.autocomplete({
+                minLength: 0,
+                source: function (request, response) {
+                    $.ajax({
+                        method: 'POST',
+                        url: '{{ fsc.url() }}',
+                        dataType: 'json',
+                        data: {
+                            action: 'autocomplete-account-prefix',
+                            tipo: type,
+                            term: request.term
+                        },
+                        success: function (results) {
+                            response(results.map(function (item) {
+                                return {label: item.value, value: item.key};
+                            }));
+                        }
+                    });
+                }
+            }).on('focus', function () {
+                $(this).autocomplete('search', this.value);
+            });
+        }
 
-$("#findIncomeSubaccount").autocomplete({
-source: function (request, response) {
-$.ajax({
-method: "POST",
-url: '{{ fsc.url() }}',
-data: {
-action: 'autocomplete-subaccount',
-term: request.term
-},
-dataType: "json",
-success: function (results) {
-let values = [];
-results.forEach(function (element) {
-if (element.key === null || element.key === element.value) {
-values.push(element);
-} else {
-values.push({
-key: element.key,
-value: element.key + " | " + element.value
-});
-}
-});
-response(values);
-},
-error: function (msg) {
-alert(msg.status + " " + msg.responseText);
-}
-});
-},
-select: function (event, ui) {
-if (ui.item.key !== null) {
-$('form[name="add-income-subaccount"] input[name="codsubcuenta"]').val(ui.item.key);
-}
-},
-open: function (event, ui) {
-$(this).autocomplete('widget').css('z-index', 1500);
-return false;
-}
-});
-});
-	</script>
+        $(document).ready(function () {
+            initModelo130AccountAutocomplete('expenseAccountPrefix', 'gasto');
+            initModelo130AccountAutocomplete('incomeAccountPrefix', 'ingreso');
+        });
+    </script>
 {% endblock %}
 
 {% block body %}
-	<form action="{{ fsc.url() }}" method="post">
-		<div class="container-fluid">
-			<div class="row">
-				<div class="col">
-					<h1 class="h2">
-						<i class="fa-solid fa-book fa-fw"></i>
-						{{ fsc.title }}
-					</h1>
-					<p>{{ trans('model-130-p') }}</p>
-				</div>
-			</div>
-			<div class="row g-2 align-items-end">
-				<div class="col-sm-6 col-md-3">
-					<div class="mb-3">
-						{{ trans('exercise') }}
-						<select name="codejercicio" class="form-select" required>
-							{% for company in fsc.empresa.all() %}
-								<optgroup label="{{ company.nombre }}">
-									{% for exercise in fsc.getAllExercises(company.idempresa) %}
-										{% if exercise.codejercicio == fsc.codejercicio %}
-											<option value="{{ exercise.codejercicio }}" selected>
-												{{ exercise.nombre }}
-											</option>
-										{% else %}
-											<option value="{{ exercise.codejercicio }}">{{ exercise.nombre }}</option>
-										{% endif %}
-									{% endfor %}
-								</optgroup>
-							{% endfor %}
-						</select>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-3">
-					<div class="mb-3">
-						{{ trans('period') }}
-						<select name="period" class="form-select" required>
-							{% for period, label in fsc.getPeriodsForComboBoxHtml() %}
-								{% if period == fsc.period %}
-									<option value="{{ period }}" selected>{{ trans(label) }}</option>
-								{% else %}
-									<option value="{{ period }}">{{ trans(label) }}</option>
-								{% endif %}
-							{% endfor %}
-						</select>
-					</div>
-				</div>
-				<div class="col">
-					<div class="mb-3">
-						<button type="submit" name="action" value="show" class="btn btn-primary">
-							<i class="fa-solid fa-eye me-1"></i>
-							{{ trans('preview') }}
-						</button>
-						{% if fsc.result is not empty %}
-							<button type="submit" name="action" value="download" class="btn btn-outline-secondary">
-								<i class="fa-solid fa-download me-1"></i>
-								{{ trans('download-aeat-file') }}
-							</button>
-						{% endif %}
-					</div>
-				</div>
-			</div>
-			<div class="row">
-				<div class="col-12">
-					<h2 class="h3 mt-3">
-						<i class="fa-regular fa-clipboard fa-fw"></i>
-						{{ trans('summary') }}
-					</h2>
-					<div class="alert alert-dismissible alert-info">
-						<p class="mb-0">{{ trans('model-130-r') }}</p>
-						<p class="mb-0">{{ trans('model-130-desc') }}</p>
-					</div>
-				</div>
-			</div>
-			<h3 class="h5 mt-2">{{ trans('net-total') }}</h3>
-			<div class="row g-2">
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('tax-incomes') }}
-						<div class="input-group">
-							<span class="input-group-text">01</span>
-							<input type="number" value="{{ fsc.result.taxbaseIngresos }}" class="form-control text-end" readonly/>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('tax-expenses') }}
-						<div class="input-group">
-							<span class="input-group-text">02</span>
-							<input type="number" value="{{ fsc.result.taxbaseGastos }}" class="form-control text-end" readonly/>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('net-total') }}
-						<div class="input-group">
-							<span class="input-group-text">03</span>
-							<input type="number" value="{{ fsc.result.taxbase }}" class="form-control text-end" readonly/>
-						</div>
-					</div>
-				</div>
-			</div>
-			<hr/>
-			<h3 class="h5">{{ trans('pct-to-deduct') }}</h3>
-			<div class="row g-2">
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('gastos-justificacion-pct') }}
-						<div class="input-group">
-							<input type="number" name="gastosJustificacionPct" min="0" max="100" step="0.01" value="{{ fsc.gastosJustificacionPct }}" class="form-control text-end" onchange="if (this.value < 0) this.value = 0; if (this.value > 100) this.value = 100; this.form.submit();"/>
-							<span class="input-group-text">%</span>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						<div class="form-check mb-1">
-							<input type="checkbox" class="form-check-input" id="applyGastosJustificacion" name="applyGastosJustificacion" value="1" onchange="this.form.submit();" {{ fsc.applyGastosJustificacion ? 'checked' : '' }}>
-							<label class="form-check-label" for="applyGastosJustificacion">
-								{{ trans('gastos-justificacion') }}
-							</label>
-						</div>
-						<div class="input-group">
-							<input type="number" value="{{ fsc.result.gastosJustificacion }}" class="form-control text-end" readonly/>
-						</div>
-						{% if fsc.result.gastosJustificacion >= 2000 %}
-							<p class="form-text text-warning fw-bold">
-								<i class="fa-solid fa-triangle-exclamation me-1"></i>
-								{{ trans('gastos-justificacion-limit') }}
-							</p>
-						{% endif %}
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('pct-to-deduct') }}
-						<div class="input-group">
-							<input type="number" name="todeduct" min="0" max="100" value="{{ fsc.todeduct }}" class="form-control text-end" onchange="if (this.value < 0) this.value = 0; if (this.value > 100) this.value = 100; this.form.submit();" required/>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ fsc.result.todeduct }}%
-						{{ trans('after-deduct') }}
-						<div class="input-group">
-							<span class="input-group-text">04</span>
-							<input type="number" value="{{ fsc.result.afterdeduct }}" class="form-control text-end" readonly/>
-						</div>
-					</div>
-				</div>
-			</div>
-			<hr/>
-			<h3 class="h5">{{ trans('result') }}</h3>
-			<div class="row g-2">
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('previous-model') }}
-						<div class="input-group">
-							<span class="input-group-text">05</span>
-							<input type="number" value="{{ fsc.result.positivosTrimestres }}" class="form-control text-end" readonly/>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('retentions') }}
-						<div class="input-group">
-							<span class="input-group-text">06</span>
-							<input type="number" value="{{ fsc.result.taxbaseRetenciones }}" class="form-control text-end" readonly/>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-6 col-md-4 col-lg-3">
-					<div class="mb-3">
-						{{ trans('result') }}
-						<div class="input-group">
-							<span class="input-group-text">07</span>
-							<input type="number" value="{{ fsc.result.result }}" class="form-control text-end" readonly/>
-						</div>
-						<p class="form-text text-muted">{{ trans('tax-negative-info') }}</p>
-					</div>
-				</div>
-				{% if fsc.result.result > 0 %}
-					<div class="col d-flex justify-content-end align-items-center">
-						<button type="button" class="btn btn-success mt-2 float-start float-sm-right" data-bs-toggle="modal" data-bs-target="#createAccountingModal">
-							<i class="fa-solid fa-scale-balanced"></i>
-							{{ trans('create-accounting-entry') }}
-						</button>
-					</div>
-				{% endif %}
-			</div>
-		</div>
-	</form>
-	<ul class="nav nav-tabs" id="myTab" role="tablist">
-		<li class="nav-item" role="presentation">
-			<a class="nav-link {{ fsc.activeTab is empty ? 'active' : '' }}" id="sales-tab" data-bs-toggle="tab" href="#sales" role="tab" aria-controls="sales" aria-selected="{{ fsc.tabDeductibleSubaccount ? 'false' : 'true' }}" title="{{ trans('sales') }}">
-				<i class="fa-solid fa-file-invoice-dollar me-1" aria-hidden="true"></i>
-				<span class="d-none d-sm-inline-block">{{ trans('sales') }}</span>
-				{% if fsc.result.customerInvoices %}
-					<span class="badge bg-secondary">{{ fsc.result.customerInvoices|length }}</span>
-				{% endif %}
-			</a>
-		</li>
-		<li class="nav-item" role="presentation">
-			<a class="nav-link" id="purchases-tab" data-bs-toggle="tab" href="#purchases" role="tab" aria-controls="purchases" aria-selected="false" title="{{ trans('purchases') }}">
-				<i class="fa-solid fa-file-invoice-dollar me-1" aria-hidden="true"></i>
-				<span class="d-none d-sm-inline-block">{{ trans('purchases') }}</span>
-				{% if fsc.result.supplierInvoices %}
-					<span class="badge bg-secondary">{{ fsc.result.supplierInvoices|length }}</span>
-				{% endif %}
-			</a>
-		</li>
-		<li class="nav-item" role="presentation">
-			<a class="nav-link" id="accounting-tab" data-bs-toggle="tab" href="#accounting" role="tab" aria-controls="accounting" aria-selected="false" title="{{ trans('accounting-entries') }}">
-				<i class="fa-solid fa-balance-scale me-1" aria-hidden="true"></i>
-				<span class="d-none d-sm-inline-block">{{ trans('accounting-entries') }}</span>
-				{% if fsc.result.accountingEntries %}
-					<span class="badge bg-secondary">{{ fsc.result.accountingEntries|length }}</span>
-				{% endif %}
-			</a>
-		</li>
-		<li class="nav-item" role="presentation">
-			<a class="nav-link {{ fsc.activeTab == 'deductible-subaccount' ? 'active' : '' }}" id="deductible-subaccounts-tab" data-bs-toggle="tab" href="#deductible-subaccounts" role="tab" aria-controls="deductible-subaccounts" aria-selected="{{ fsc.activeTab == 'deductible-subaccount' ? 'true' : 'false' }}" title="{{ trans('deductible-subaccounts') }}">
-				<i class="fa-solid fa-book me-1" aria-hidden="true"></i>
-				<span class="d-none d-sm-inline-block">{{ trans('deductible-subaccounts') }}</span>
-				{% set deductibleList = fsc.getDeductibleSubaccounts() %}
-				{% if deductibleList|length %}
-					<span class="badge bg-secondary">{{ deductibleList|length }}</span>
-				{% endif %}
-			</a>
-		</li>
-		<li class="nav-item" role="presentation">
-			<a class="nav-link {{ fsc.activeTab == 'income-subaccount' ? 'active' : '' }}" id="income-subaccounts-tab" data-bs-toggle="tab" href="#income-subaccounts" role="tab" aria-controls="income-subaccounts" aria-selected="{{ fsc.activeTab == 'income-subaccount' ? 'true' : 'false' }}" title="{{ trans('income-subaccounts') }}">
-				<i class="fa-solid fa-coins me-1" aria-hidden="true"></i>
-				<span class="d-none d-sm-inline-block">{{ trans('income-subaccounts') }}</span>
-				{% set incomeList = fsc.getIncomeSubaccounts() %}
-				{% if incomeList|length %}
-					<span class="badge bg-secondary">{{ incomeList|length }}</span>
-				{% endif %}
-			</a>
-		</li>
-	</ul>
-	<div class="tab-content" id="myTabContent">
-		<div class="tab-pane fade {{ fsc.activeTab is empty ? 'show active' : '' }}" id="sales" role="tabpanel" aria-labelledby="sales-tab">
-			<div class="table-responsive">
-				<table class="table table-hover">
-					<thead>
-						<tr>
-							<th>{{ trans('invoice') }}</th>
-							<th>{{ trans('customer') }}</th>
-							<th class="text-end">{{ trans('tax-base') }}</th>
-							<th class="text-end">{{ trans('vat') }}</th>
-							<th class="text-end">{{ trans('surcharge') }}</th>
-							<th class="text-end">{{ trans('irpf') }}</th>
-							<th class="text-end">{{ trans('total') }}</th>
-							<th class="text-end">{{ trans('date') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% set salesTotalNeto = 0 %}
-						{% set salesTotalTax = 0 %}
-						{% set salesTotalSurcharge = 0 %}
-						{% set salesTotalRetention = 0 %}
-						{% set salesTotal = 0 %}
-						{% for item in fsc.result.customerInvoices %}
-							{% set salesTotalNeto = salesTotalNeto + item.neto %}
-							{% set salesTotalTax = salesTotalTax + item.totaliva %}
-							{% set salesTotalSurcharge = salesTotalSurcharge + item.totalrecargo %}
-							{% set salesTotalRetention = salesTotalRetention + item.totalirpf %}
-							{% set salesTotal = salesTotal + item.total %}
-							<tr>
-								<td>
-									<a href="{{ item.url() }}">{{ item.codigo }}</a>
-								</td>
-								<td>{{ item.nombrecliente | raw }}</td>
-								<td class="text-end">{{ money(item.neto) }}</td>
-								<td class="text-end">{{ money(item.totaliva) }}</td>
-								<td class="text-end">{{ money(item.totalrecargo) }}</td>
-								<td class="text-end">{{ money(item.totalirpf) }}</td>
-								<td class="text-end">{{ money(item.total) }}</td>
-								<td class="text-end">{{ item.fecha }}</td>
-							</tr>
-						{% else %}
-							<tr class="table-warning">
-								<td colspan="8">{{ trans('no-data') }}</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-				<table class="table table-sm table-hover">
-					<thead>
-						<tr>
-							<th></th>
-							<th class="text-end text-capitalize">{{ trans('totals') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('tax-base') }}</td>
-							<td class="text-end">{{ money(salesTotalNeto) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('vat') }}</td>
-							<td class="text-end">{{ money(salesTotalTax) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('surcharge') }}</td>
-							<td class="text-end">{{ money(salesTotalSurcharge) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('irpf') }}</td>
-							<td class="text-end">{{ money(salesTotalRetention) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('total-amount') }}</td>
-							<td class="text-end">{{ money(salesTotal) }}</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-		<div class="tab-pane fade" id="purchases" role="tabpanel" aria-labelledby="purchases-tab">
-			<div class="table-responsive">
-				<table class="table table-hover">
-					<thead>
-						<tr>
-							<th>{{ trans('invoice') }}</th>
-							<th>{{ trans('supplier') }}</th>
-							<th class="text-end">{{ trans('tax-base') }}</th>
-							<th class="text-end">{{ trans('vat') }}</th>
-							<th class="text-end">{{ trans('surcharge') }}</th>
-							<th class="text-end">{{ trans('irpf') }}</th>
-							<th class="text-end">{{ trans('total') }}</th>
-							<th class="text-end">{{ trans('date') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% set purchasesTotalNeto = 0 %}
-						{% set purchasesTotalTax = 0 %}
-						{% set purchasesTotalSurcharge = 0 %}
-						{% set purchasesTotalRetention = 0 %}
-						{% set purchasesTotal = 0 %}
-						{% for item in fsc.result.supplierInvoices %}
-							{% set purchasesTotalNeto = purchasesTotalNeto + item.neto %}
-							{% set purchasesTotalTax = purchasesTotalTax + item.totaliva %}
-							{% set purchasesTotalSurcharge = purchasesTotalSurcharge + item.totalrecargo %}
-							{% set purchasesTotalRetention = purchasesTotalRetention + item.totalirpf %}
-							{% set purchasesTotal = purchasesTotal + item.total %}
-							<tr>
-								<td>
-									<a href="{{ item.url() }}">{{ item.codigo }}</a>
-								</td>
-								<td>{{ item.nombre | raw }}</td>
-								<td class="text-end">{{ money(item.neto) }}</td>
-								<td class="text-end">{{ money(item.totaliva) }}</td>
-								<td class="text-end">{{ money(item.totalrecargo) }}</td>
-								<td class="text-end">{{ money(item.totalirpf) }}</td>
-								<td class="text-end">{{ money(item.total) }}</td>
-								<td class="text-end">{{ item.fecha }}</td>
-							</tr>
-						{% else %}
-							<tr class="table-warning">
-								<td colspan="8">{{ trans('no-data') }}</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-				<table class="table table-sm table-hover">
-					<thead>
-						<tr>
-							<th></th>
-							<th class="text-end text-capitalize">{{ trans('totals') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('tax-base') }}</td>
-							<td class="text-end">{{ money(purchasesTotalNeto) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('vat') }}</td>
-							<td class="text-end">{{ money(purchasesTotalTax) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('surcharge') }}</td>
-							<td class="text-end">{{ money(purchasesTotalSurcharge) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('irpf') }}</td>
-							<td class="text-end">{{ money(purchasesTotalRetention) }}</td>
-						</tr>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('total-amount') }}</td>
-							<td class="text-end">{{ money(purchasesTotal) }}</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-		<div class="tab-pane fade" id="accounting" role="tabpanel" aria-labelledby="accounting-tab">
-			<div class="table-responsive">
-				<table class="table table-hover">
-					<thead>
-						<tr>
-							<th>{{ trans('accounting-entry') }}</th>
-							<th>{{ trans('subaccount') }}</th>
-							<th>{{ trans('concept') }}</th>
-							<th class="text-end">{{ trans('total') }}</th>
-							<th class="text-end">{{ trans('date') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% set accountingTotalNeto = 0 %}
-						{% for item in fsc.result.accountingEntries %}
-							{% set accountingTotalNeto = accountingTotalNeto + item.debe %}
-							<tr>
-								<td>
-									<a href="{{ item.url() }}">{{ item.numero }}</a>
-								</td>
-								<td>{{ item.codsubcuenta }}</td>
-								<td>{{ item.concepto | raw }}</td>
-								<td class="text-end">{{ money(item.debe) }}</td>
-								<td class="text-end">{{ item.fecha }}</td>
-							</tr>
-						{% else %}
-							<tr class="table-warning">
-								<td colspan="8">{{ trans('no-data') }}</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-				<table class="table table-sm table-hover">
-					<thead>
-						<tr>
-							<th></th>
-							<th class="text-end text-capitalize">{{ trans('totals') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr>
-							<td class="text-end fw-bold">{{ trans('total-amount') }}</td>
-							<td class="text-end">{{ money(accountingTotalNeto) }}</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-		<div class="tab-pane fade {{ fsc.activeTab == 'deductible-subaccount' ? 'show active' : '' }}" id="deductible-subaccounts" role="tabpanel" aria-labelledby="deductible-subaccounts-tab">
-			<div class="table-responsive">
-				<table class="table table-sm table-hover">
-					<thead>
-						<tr>
-							<th>{{ trans('code') }}</th>
-							<th>{{ trans('description') }}</th>
-							<th></th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for subaccount in fsc.getDeductibleSubaccounts() %}
-							<tr>
-								<td>{{ subaccount.codsubcuenta }}</td>
-								<td>{{ subaccount.getSubcuenta().descripcion }}</td>
-								<td class="text-end">
-									<form method="post" onsubmit="animateSpinner('add')">
-										{{ formToken() }}
-										<input type="hidden" name="id" value="{{ subaccount.id }}">
-										<input type="hidden" name="action" value="delete-deductible-subaccount">
-										<button type="submit" class="btn btn-sm btn-danger btn-spin-action">
-											<i class="fa-solid fa-trash-alt me-1"></i>
-											{{ trans('delete') }}
-										</button>
-									</form>
-								</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			</div>
-			<form name="add-subaccount" method="post" onsubmit="animateSpinner('add')">
-				{{ formToken() }}
-				<input type="hidden" name="action" value="add-deductible-subaccount">
-				<input type="hidden" name="codsubcuenta">
-				<div class="card shadow m-3">
-					<div class="card-body">
-						<div class="input-group">
-							<input type="text" id="findSubaccount" class="form-control" placeholder="{{ trans('search') }}">
-							<button type="submit" class="btn btn-outline-success">
-								<i class="fa-solid fa-plus me-1"></i>
-								{{ trans('add') }}
-							</button>
-						</div>
-					</div>
-				</div>
-			</form>
-		</div>
-		<div class="tab-pane fade {{ fsc.activeTab == 'income-subaccount' ? 'show active' : '' }}" id="income-subaccounts" role="tabpanel" aria-labelledby="income-subaccounts-tab">
-			<div class="table-responsive">
-				<table class="table table-sm table-hover">
-					<thead>
-						<tr>
-							<th>{{ trans('code') }}</th>
-							<th>{{ trans('description') }}</th>
-							<th></th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for subaccount in fsc.getIncomeSubaccounts() %}
-							<tr>
-								<td>{{ subaccount.codsubcuenta }}</td>
-								<td>{{ subaccount.getSubcuenta().descripcion }}</td>
-								<td class="text-end">
-									<form method="post" onsubmit="animateSpinner('add')">
-										{{ formToken() }}
-										<input type="hidden" name="id" value="{{ subaccount.id }}">
-										<input type="hidden" name="action" value="delete-income-subaccount">
-										<button type="submit" class="btn btn-sm btn-danger btn-spin-action">
-											<i class="fa-solid fa-trash-alt me-1"></i>
-											{{ trans('delete') }}
-										</button>
-									</form>
-								</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			</div>
-			<form name="add-income-subaccount" method="post" onsubmit="animateSpinner('add')">
-				{{ formToken() }}
-				<input type="hidden" name="action" value="add-income-subaccount">
-				<input type="hidden" name="codsubcuenta">
-				<div class="card shadow m-3">
-					<div class="card-body">
-						<div class="input-group">
-							<input type="text" id="findIncomeSubaccount" class="form-control" placeholder="{{ trans('search') }}">
-							<button type="submit" class="btn btn-outline-success">
-								<i class="fa-solid fa-plus me-1"></i>
-								{{ trans('add') }}
-							</button>
-						</div>
-					</div>
-				</div>
-			</form>
-		</div>
-	</div>
+    <form action="{{ fsc.url() }}" method="post">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col">
+                    <h1 class="h2">
+                        <i class="fa-solid fa-book fa-fw"></i>
+                        {{ fsc.title }}
+                    </h1>
+                    <p>{{ trans('model-130-p') }}</p>
+                </div>
+            </div>
 
-	<!-- Create Accounting Modal -->
-	<div class="modal fade" id="createAccountingModal" tabindex="-1" role="dialog" aria-labelledby="createAccountingModalLabel" aria-hidden="true">
-		<div class="modal-dialog" role="document">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h5 class="modal-title" id="createAccountingModalLabel">{{ trans('create-accounting-entry') }}</h5>
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-				</div>
-				<form name="create-accounting" method="post" onsubmit="animateSpinner('add')">
-					{{ formToken() }}
-					{% set exercise = fsc.getExercise(fsc.codejercicio) %}
-					<input type="hidden" name="action" value="gen-accounting">
-					<input type="hidden" name="idempresa" value="{{ exercise.idempresa }}">
-					<input type="hidden" name="codejercicio" value="{{ fsc.codejercicio }}">
-					<input type="hidden" name="period" value="{{ fsc.period }}">
-					<div class="modal-body">
-						<div class="mb-3">
-							<label for="entryDate">{{ trans('accounting-entry-date') }}</label>
-							{% set year = exercise.fechainicio|date("Y") %}
-							{% set date = "now"|date("Y-m-d") %}
-							{% if fsc.period == 'T1' %}
-								{% set date = year ~ '-03-31' %}
-							{% elseif fsc.period == 'T2' %}
-								{% set date = year ~ '-06-30' %}
-							{% elseif fsc.period == 'T3' %}
-								{% set date = year ~ '-09-30' %}
-							{% elseif fsc.period == 'T4' %}
-								{% set date = year ~ '-12-31' %}
-							{% endif %}
-							<input type="date" class="form-control" id="date" name="date" value="{{ date }}" required readonly>
-						</div>
-						<div class="mb-3">
-							<label for="entryAmount">{{ trans('amount') }}</label>
-							<input type="number" step="any" class="form-control" id="amount" name="amount" value="{{ fsc.result.result }}" required>
-						</div>
-						<div class="mb-3">
-							<label for="paymentMethod">{{ trans('payment-method') }}</label>
-							<select class="form-select" id="paymentMethod" name="paymentMethod" required>
-								{% for method in fsc.getPaymentMethods() %}
-									{% if method.idempresa == exercise.idempresa %}
-										<option value="{{ method.codpago }}">{{ method.descripcion }}</option>
-									{% endif %}
-								{% endfor %}
-							</select>
-						</div>
-					</div>
-					<div class="modal-footer">
-						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-							<i class="fa-solid fa-xmark"></i>
-							{{ trans('cancel') }}
-						</button>
-						<button type="submit" class="btn btn-primary">
-							<i class="fa-solid fa-check"></i>
-							{{ trans('create') }}
-						</button>
-					</div>
-				</form>
-			</div>
-		</div>
-	</div>
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-6 col-md-3">
+                    <div class="mb-3">
+                        {{ trans('exercise') }}
+                        <select name="codejercicio" class="form-select" required>
+                            {% for company in fsc.empresa.all() %}
+                                <optgroup label="{{ company.nombre }}">
+                                    {% for exercise in fsc.getAllExercises(company.idempresa) %}
+                                        {% if exercise.codejercicio == fsc.codejercicio %}
+                                            <option value="{{ exercise.codejercicio }}" selected>
+                                                {{ exercise.nombre }}
+                                            </option>
+                                        {% else %}
+                                            <option value="{{ exercise.codejercicio }}">{{ exercise.nombre }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-md-3">
+                    <div class="mb-3">
+                        {{ trans('period') }}
+                        <select name="period" class="form-select" required>
+                            {% for period, label in fsc.getPeriodsForComboBoxHtml() %}
+                                {% if period == fsc.period %}
+                                    <option value="{{ period }}" selected>{{ trans(label) }}</option>
+                                {% else %}
+                                    <option value="{{ period }}">{{ trans(label) }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="mb-3">
+                        <button type="submit" name="action" value="show" class="btn btn-primary">
+                            <i class="fa-solid fa-eye me-1"></i>
+                            {{ trans('preview') }}
+                        </button>
+                        {% if fsc.result is not empty %}
+                            <button type="submit" name="action" value="download" class="btn btn-outline-secondary">
+                                <i class="fa-solid fa-download me-1"></i>
+                                {{ trans('download-aeat-file') }}
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="h3 mt-3">
+                        <i class="fa-regular fa-clipboard fa-fw"></i>
+                        {{ trans('summary') }}
+                    </h2>
+                    <div class="alert alert-dismissible alert-info">
+                        <p class="mb-0">{{ trans('model-130-r') }}</p>
+                        <p class="mb-0">{{ trans('model-130-desc') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="h5 mt-2">{{ trans('net-total') }}</h3>
+            <div class="row g-2">
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('tax-incomes') }}
+                        <div class="input-group">
+                            <span class="input-group-text">01</span>
+                            <input type="number" value="{{ fsc.result.taxbaseIngresos }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('tax-expenses') }}
+                        <div class="input-group">
+                            <span class="input-group-text">02</span>
+                            <input type="number" value="{{ fsc.result.taxbaseGastos }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('net-total') }}
+                        <div class="input-group">
+                            <span class="input-group-text">03</span>
+                            <input type="number" value="{{ fsc.result.taxbase }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr/>
+
+            <h3 class="h5">{{ trans('pct-to-deduct') }}</h3>
+            <div class="row g-2">
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('gastos-justificacion-pct') }}
+                        <div class="input-group">
+                            <input type="number" name="gastosJustificacionPct" min="0" max="100" step="0.01" value="{{ fsc.gastosJustificacionPct }}" class="form-control text-end" onchange="if (this.value < 0) this.value = 0; if (this.value > 100) this.value = 100; this.form.submit();"/>
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        <div class="form-check mb-1">
+                            <input type="checkbox" class="form-check-input" id="applyGastosJustificacion" name="applyGastosJustificacion" value="1" onchange="this.form.submit();" {{ fsc.applyGastosJustificacion ? 'checked' : '' }}>
+                            <label class="form-check-label" for="applyGastosJustificacion">
+                                {{ trans('gastos-justificacion') }}
+                            </label>
+                        </div>
+                        <div class="input-group">
+                            <input type="number" value="{{ fsc.result.gastosJustificacion }}" class="form-control text-end" readonly/>
+                        </div>
+                        {% if fsc.result.gastosJustificacion >= 2000 %}
+                            <p class="form-text text-warning fw-bold">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                {{ trans('gastos-justificacion-limit') }}
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('pct-to-deduct') }}
+                        <div class="input-group">
+                            <input type="number" name="todeduct" min="0" max="100" value="{{ fsc.todeduct }}" class="form-control text-end" onchange="if (this.value < 0) this.value = 0; if (this.value > 100) this.value = 100; this.form.submit();" required/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ fsc.result.todeduct }}% {{ trans('after-deduct') }}
+                        <div class="input-group">
+                            <span class="input-group-text">04</span>
+                            <input type="number" value="{{ fsc.result.afterdeduct }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr/>
+
+            <h3 class="h5">{{ trans('result') }}</h3>
+            <div class="row g-2">
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('previous-model') }}
+                        <div class="input-group">
+                            <span class="input-group-text">05</span>
+                            <input type="number" value="{{ fsc.result.positivosTrimestres }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('retentions') }}
+                        <div class="input-group">
+                            <span class="input-group-text">06</span>
+                            <input type="number" value="{{ fsc.result.taxbaseRetenciones }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        {{ trans('fractional-payment') }}
+                        <div class="input-group">
+                            <span class="input-group-text">07</span>
+                            <input type="number" value="{{ fsc.result.fractionalPayment }}" class="form-control text-end" readonly/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="mb-3">
+                        <strong>{{ trans('result') }}</strong>
+                        <div class="input-group">
+                            <span class="input-group-text">19</span>
+                            <input type="number" value="{{ fsc.result.result }}" class="form-control text-end fw-bold" readonly/>
+                        </div>
+                        <p class="form-text text-muted">{{ trans('tax-negative-info') }}</p>
+                    </div>
+                </div>
+                {% if fsc.result.currentPaymentEntry %}
+                    <div class="col d-flex justify-content-end align-items-center">
+                        <a href="{{ fsc.result.currentPaymentEntry.url() }}" class="btn btn-outline-success mt-2">
+                            <i class="fa-solid fa-circle-check me-1"></i>
+                            {{ trans('accounting-entry') }} {{ fsc.result.currentPaymentEntry.numero }}
+                        </a>
+                    </div>
+                {% elseif fsc.result.result > 0 %}
+                    <div class="col d-flex justify-content-end align-items-center">
+                        <button type="button" class="btn btn-success mt-2 float-start float-sm-right" data-bs-toggle="modal" data-bs-target="#createAccountingModal">
+                            <i class="fa-solid fa-scale-balanced"></i>
+                            {{ trans('create-accounting-entry') }}
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {{ fsc.activeTab is empty ? 'active' : '' }}" id="sales-tab" data-bs-toggle="tab" href="#sales" role="tab" aria-controls="sales" aria-selected="{{ fsc.activeTab is empty ? 'true' : 'false' }}" title="{{ trans('sales') }}">
+                <i class="fa-solid fa-file-invoice-dollar me-1" aria-hidden="true"></i>
+                <span class="d-none d-sm-inline-block">{{ trans('sales') }}</span>
+                {% if fsc.result.sales %}
+                    <span class="badge bg-secondary">{{ fsc.result.sales|length }}</span>
+                {% endif %}
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" id="purchases-tab" data-bs-toggle="tab" href="#purchases" role="tab" aria-controls="purchases" aria-selected="false" title="{{ trans('purchases') }}">
+                <i class="fa-solid fa-file-invoice-dollar me-1" aria-hidden="true"></i>
+                <span class="d-none d-sm-inline-block">{{ trans('purchases') }}</span>
+                {% if fsc.result.purchases %}
+                    <span class="badge bg-secondary">{{ fsc.result.purchases|length }}</span>
+                {% endif %}
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" id="accounting-tab" data-bs-toggle="tab" href="#accounting" role="tab" aria-controls="accounting" aria-selected="false" title="{{ trans('accounting-entries') }}">
+                <i class="fa-solid fa-balance-scale me-1" aria-hidden="true"></i>
+                <span class="d-none d-sm-inline-block">{{ trans('accounting-entries') }}</span>
+                {% if fsc.result.accountingEntries %}
+                    <span class="badge bg-secondary">{{ fsc.result.accountingEntries|length }}</span>
+                {% endif %}
+            </a>
+        </li>
+
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {{ fsc.activeTab == 'expense-accounts' ? 'active' : '' }}" id="expense-accounts-tab" data-bs-toggle="tab" href="#expense-accounts" role="tab">
+                <i class="fa-solid fa-receipt me-1"></i>
+                <span class="d-none d-sm-inline-block">{{ trans('model-130-expense-accounts') }}</span>
+                <span class="badge bg-secondary">{{ fsc.getExpenseRules()|length }}</span>
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {{ fsc.activeTab == 'income-accounts' ? 'active' : '' }}" id="income-accounts-tab" data-bs-toggle="tab" href="#income-accounts" role="tab">
+                <i class="fa-solid fa-coins me-1"></i>
+                <span class="d-none d-sm-inline-block">{{ trans('model-130-income-accounts') }}</span>
+                <span class="badge bg-secondary">{{ fsc.getIncomeRules()|length }}</span>
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade {{ fsc.activeTab is empty ? 'show active' : '' }}" id="sales" role="tabpanel" aria-labelledby="sales-tab">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>{{ trans('serie') }}</th>
+                            <th>{{ trans('invoice') }}</th>
+                            <th>{{ trans('accounting-entry') }}</th>
+                            <th>{{ trans('date') }}</th>
+                            <th>{{ trans('concept') }}</th>
+                            <th class="text-end">{{ trans('tax-base') }}</th>
+                            <th class="text-end">{{ trans('irpf') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set salesTotalBase = 0 %}
+                        {% set salesTotalIrpf = 0 %}
+                        {% for item in fsc.result.sales %}
+                            {% set salesTotalBase = salesTotalBase + item.baseimponible %}
+                            {% set salesTotalIrpf = salesTotalIrpf + item.irpf %}
+                            <tr>
+                                <td>{{ item.serie }}</td>
+                                <td>
+                                    {% if item.invoice is defined and item.invoice %}
+                                        <a href="{{ item.invoice.url() }}">{{ item.factura }}</a>
+                                    {% else %}
+                                        {{ item.factura }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.entry %}
+                                        <a href="{{ item.entry.url() }}">{{ item.entry.numero }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.fecha }}</td>
+                                <td>{{ item.concepto | raw }}</td>
+                                <td class="text-end">{{ money(item.baseimponible) }}</td>
+                                <td class="text-end">{{ money(item.irpf) }}</td>
+                            </tr>
+                        {% else %}
+                            <tr class="table-warning">
+                                <td colspan="7">{{ trans('no-data') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="5" class="text-end">{{ trans('totals') }}</th>
+                            <th class="text-end">{{ money(salesTotalBase) }}</th>
+                            <th class="text-end">{{ money(salesTotalIrpf) }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="purchases" role="tabpanel" aria-labelledby="purchases-tab">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>{{ trans('serie') }}</th>
+                            <th>{{ trans('invoice') }}</th>
+                            <th>{{ trans('accounting-entry') }}</th>
+                            <th>{{ trans('date') }}</th>
+                            <th>{{ trans('concept') }}</th>
+                            <th class="text-end">{{ trans('tax-base') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set purchasesTotalBase = 0 %}
+                        {% for item in fsc.result.purchases %}
+                            {% set purchasesTotalBase = purchasesTotalBase + item.baseimponible %}
+                            <tr>
+                                <td>{{ item.serie }}</td>
+                                <td>
+                                    {% if item.invoice is defined and item.invoice %}
+                                        <a href="{{ item.invoice.url() }}">{{ item.factura }}</a>
+                                    {% else %}
+                                        {{ item.factura }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.entry %}
+                                        <a href="{{ item.entry.url() }}">{{ item.entry.numero }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.fecha }}</td>
+                                <td>{{ item.concepto | raw }}</td>
+                                <td class="text-end">{{ money(item.baseimponible) }}</td>
+                            </tr>
+                        {% else %}
+                            <tr class="table-warning">
+                                <td colspan="6">{{ trans('no-data') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="5" class="text-end">{{ trans('totals') }}</th>
+                            <th class="text-end">{{ money(purchasesTotalBase) }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="accounting" role="tabpanel" aria-labelledby="accounting-tab">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>{{ trans('accounting-entry') }}</th>
+                            <th>{{ trans('subaccount') }}</th>
+                            <th>{{ trans('date') }}</th>
+                            <th>{{ trans('concept') }}</th>
+                            <th>{{ trans('type') }}</th>
+                            <th class="text-end">{{ trans('total') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set accountingTotal = 0 %}
+                        {% for item in fsc.result.accountingEntries %}
+                            {% set accountingTotal = accountingTotal + item.amount %}
+                            <tr>
+                                <td>
+                                    <a href="{{ item.entry.url() }}">{{ item.entry.numero }}</a>
+                                </td>
+                                <td>{{ item.partida.codsubcuenta }}</td>
+                                <td>{{ item.entry.fecha }}</td>
+                                <td>{{ item.partida.concepto | raw }}</td>
+                                <td>{{ trans(item.type) }}</td>
+                                <td class="text-end">{{ money(item.amount) }}</td>
+                            </tr>
+                        {% else %}
+                            <tr class="table-warning">
+                                <td colspan="6">{{ trans('no-data') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+{# 
+                    <tfoot>
+                        <tr>
+                            <th colspan="5" class="text-end">{{ trans('totals') }}</th>
+                            <th class="text-end">{{ money(accountingTotal) }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot> 
+#}
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade {{ fsc.activeTab == 'expense-accounts' ? 'show active' : '' }}" id="expense-accounts" role="tabpanel">
+            {% set expenseRules = fsc.getExpenseRules() %}
+            <div class="container-fluid py-3">
+                <div class="alert alert-info">{{ trans('model-130-prefix-help') }}</div>
+                <form method="post" class="row g-2 align-items-end">
+                    {{ formToken() }}
+                    <input type="hidden" name="action" value="add-account-prefix">
+                    <input type="hidden" name="tipo" value="gasto">
+                    <div class="col-sm-8 col-md-6">
+                        <label for="expenseAccountPrefix" class="form-label">{{ trans('model-130-account-prefix') }}</label>
+                        <input type="text" id="expenseAccountPrefix" name="codigo" class="form-control" autocomplete="off" required>
+                    </div>
+                    <div class="col-auto"><button class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i>{{ trans('add') }}</button></div>
+                </form>
+                <div class="table-responsive mt-3">
+                    <table class="table table-hover"><thead><tr><th>{{ trans('code') }}</th><th>{{ trans('description') }}</th><th></th></tr></thead><tbody>
+                    {% for rule in expenseRules %}
+                        <tr><td><code>{{ rule.codigo }}</code></td><td>{{ rule.display_description }}</td><td class="text-end">
+                            <form method="post" class="d-inline">{{ formToken() }}<input type="hidden" name="action" value="delete-account-prefix"><input type="hidden" name="tipo" value="gasto"><input type="hidden" name="id" value="{{ rule.id }}"><button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button></form>
+                        </td></tr>
+                    {% else %}<tr class="table-warning"><td colspan="3">{{ trans('no-data') }}</td></tr>{% endfor %}
+                    </tbody></table>
+                </div>
+                <form method="post" onsubmit="return confirm('{{ trans('model-130-restore-confirm') }}');">{{ formToken() }}<input type="hidden" name="action" value="restore-account-prefixes"><input type="hidden" name="tab" value="expense-accounts"><button class="btn btn-outline-secondary"><i class="fa-solid fa-rotate-left me-1"></i>{{ trans('restore') }}</button></form>
+            </div>
+        </div>
+
+        <div class="tab-pane fade {{ fsc.activeTab == 'income-accounts' ? 'show active' : '' }}" id="income-accounts" role="tabpanel">
+            {% set incomeRules = fsc.getIncomeRules() %}
+            <div class="container-fluid py-3">
+                <div class="alert alert-info">{{ trans('model-130-prefix-help') }}</div>
+                <form method="post" class="row g-2 align-items-end">
+                    {{ formToken() }}
+                    <input type="hidden" name="action" value="add-account-prefix">
+                    <input type="hidden" name="tipo" value="ingreso">
+                    <div class="col-sm-8 col-md-6">
+                        <label for="incomeAccountPrefix" class="form-label">{{ trans('model-130-account-prefix') }}</label>
+                        <input type="text" id="incomeAccountPrefix" name="codigo" class="form-control" autocomplete="off" required>
+                    </div>
+                    <div class="col-auto"><button class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i>{{ trans('add') }}</button></div>
+                </form>
+                <div class="table-responsive mt-3">
+                    <table class="table table-hover"><thead><tr><th>{{ trans('code') }}</th><th>{{ trans('description') }}</th><th></th></tr></thead><tbody>
+                    {% for rule in incomeRules %}
+                        <tr><td><code>{{ rule.codigo }}</code></td><td>{{ rule.display_description }}</td><td class="text-end">
+                            <form method="post" class="d-inline">{{ formToken() }}<input type="hidden" name="action" value="delete-account-prefix"><input type="hidden" name="tipo" value="ingreso"><input type="hidden" name="id" value="{{ rule.id }}"><button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button></form>
+                        </td></tr>
+                    {% else %}<tr class="table-warning"><td colspan="3">{{ trans('no-data') }}</td></tr>{% endfor %}
+                    </tbody></table>
+                </div>
+                <form method="post" onsubmit="return confirm('{{ trans('model-130-restore-confirm') }}');">{{ formToken() }}<input type="hidden" name="action" value="restore-account-prefixes"><input type="hidden" name="tab" value="income-accounts"><button class="btn btn-outline-secondary"><i class="fa-solid fa-rotate-left me-1"></i>{{ trans('restore') }}</button></form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Accounting Modal -->
+    <div class="modal fade" id="createAccountingModal" tabindex="-1" role="dialog" aria-labelledby="createAccountingModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createAccountingModalLabel">{{ trans('create-accounting-entry') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form name="create-accounting" method="post" onsubmit="animateSpinner('add')">
+                    {{ formToken() }}
+                    {% set exercise = fsc.getExercise(fsc.codejercicio) %}
+                    <input type="hidden" name="action" value="gen-accounting">
+                    <input type="hidden" name="idempresa" value="{{ exercise.idempresa }}">
+                    <input type="hidden" name="codejercicio" value="{{ fsc.codejercicio }}">
+                    <input type="hidden" name="period" value="{{ fsc.period }}">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="date">{{ trans('accounting-entry-date') }}</label>
+                            {% set year = exercise.fechainicio|date("Y") %}
+                            {% set date = "now"|date("Y-m-d") %}
+                            {% if fsc.period == 'T1' %}
+                                {% set date = year ~ '-03-31' %}
+                            {% elseif fsc.period == 'T2' %}
+                                {% set date = year ~ '-06-30' %}
+                            {% elseif fsc.period == 'T3' %}
+                                {% set date = year ~ '-09-30' %}
+                            {% elseif fsc.period == 'T4' %}
+                                {% set date = year ~ '-12-31' %}
+                            {% endif %}
+                            <input type="date" class="form-control" id="date" name="date" value="{{ date }}" required readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="amount">{{ trans('amount') }}</label>
+                            <input type="number" step="any" class="form-control" id="amount" name="amount" value="{{ fsc.result.result }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="paymentMethod">{{ trans('payment-method') }}</label>
+                            <select class="form-select" id="paymentMethod" name="paymentMethod" required>
+                                {% for method in fsc.getPaymentMethods() %}
+                                    {% if method.idempresa == exercise.idempresa %}
+                                        <option value="{{ method.codpago }}">{{ method.descripcion }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            {{ trans('cancel') }}
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-check"></i>
+                            {{ trans('create') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 {% endblock %}

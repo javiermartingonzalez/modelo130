@@ -18,8 +18,11 @@
 
 namespace FacturaScripts\Plugins\Modelo130;
 
-use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\Template\InitClass;
+use FacturaScripts\Plugins\Modelo130\Lib\Modelo130Config;
+
+use FacturaScripts\Core\Migrations;
+use FacturaScripts\Plugins\Modelo130\Migration\MigrateV5;
 
 final class Init extends InitClass
 {
@@ -33,33 +36,7 @@ final class Init extends InitClass
 
     public function update(): void
     {
-        $this->cleanInvalidUsers();
-    }
-
-    private function cleanInvalidUsers(): void
-    {
-        // ver si existe la tabla subcuentas o usuario
-        $db = new DataBase();
-        if (false === $db->tableExists('subcuentas_130') ||
-            false === $db->tableExists('users')) {
-            return;
-        }
-
-        // consulta compatible con mysql y postgresql
-        // elimina el registro foráneo si no existe en la tabla original
-        $templateSql = "UPDATE subcuentas_130
-        SET REPLACE_COLUMN = NULL
-        WHERE REPLACE_COLUMN IS NOT NULL
-        AND NOT EXISTS (
-            SELECT 1
-            FROM users
-            WHERE users.nick = subcuentas_130.REPLACE_COLUMN
-        );";
-
-        foreach (['nick', 'last_nick'] as $column) {
-            // reemplazar la columna de user en la tabla subcuentas_130 y ejecutar
-            $sql = str_replace("REPLACE_COLUMN", $column, $templateSql);
-            $db->exec($sql);
-        }
+        Migrations::runPluginMigration(new MigrateV5());
+        Modelo130Config::ensureDefaults();
     }
 }

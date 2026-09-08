@@ -27,9 +27,10 @@ use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Ejercicio;
 use FacturaScripts\Dinamic\Model\Empresa;
 use FacturaScripts\Dinamic\Model\FormaPago;
-use FacturaScripts\Dinamic\Model\Subcuenta130;
+use FacturaScripts\Dinamic\Model\Mod130Conf;
 use FacturaScripts\Dinamic\Lib\Modelo130 as DinModelo130;
 use FacturaScripts\Dinamic\Lib\Modelo130Export as DinModelo130Export;
+use FacturaScripts\Dinamic\Lib\Modelo130Config as DinModelo130Config;
 
 /**
  * Description of Modelo130
@@ -48,16 +49,10 @@ class Modelo130 extends Controller
     public $applyGastosJustificacion = false;
 
     /** @var float */
-    public $gastosJustificacionPct = 7.0;
+    public $gastosJustificacionPct = 5.0;
 
     /** @var string */
     public $codejercicio;
-
-    /** @var Subcuenta130 */
-    public $deductibleSubaccount;
-
-    /** @var Subcuenta130 */
-    public $incomeSubaccount;
 
     /** @var string */
     public $period = 'T1';
@@ -84,13 +79,8 @@ class Modelo130 extends Controller
                 $list[] = $exercise;
             }
         }
-        return $list;
-    }
 
-    public function getDeductibleSubaccounts(): array
-    {
-        $where = [Where::eq('tipo', Subcuenta130::TIPO_DEDUCIBLE)];
-        return (new Subcuenta130())->all($where, ['codsubcuenta' => 'ASC'], 0, 0);
+        return $list;
     }
 
     /**
@@ -104,10 +94,24 @@ class Modelo130 extends Controller
         return $exercise;
     }
 
-    public function getIncomeSubaccounts(): array
+
+    public function getAccountRules(string $type): array
     {
-        $where = [Where::eq('tipo', Subcuenta130::TIPO_INGRESO)];
-        return (new Subcuenta130())->all($where, ['codsubcuenta' => 'ASC'], 0, 0);
+        $rules = DinModelo130Config::rules($type);
+        foreach ($rules as $rule) {
+            $rule->display_description = DinModelo130Config::description($rule->codigo);
+        }
+        return $rules;
+    }
+
+    public function getExpenseRules(): array
+    {
+        return $this->getAccountRules(Mod130Conf::TIPO_GASTO);
+    }
+
+    public function getIncomeRules(): array
+    {
+        return $this->getAccountRules(Mod130Conf::TIPO_INGRESO);
     }
 
     public function getPageData(): array
@@ -138,47 +142,154 @@ class Modelo130 extends Controller
     public function privateCore(&$response, $user, $permissions)
     {
         parent::privateCore($response, $user, $permissions);
-        $this->deductibleSubaccount = new Subcuenta130();
-        $this->incomeSubaccount = new Subcuenta130();
 
         $action = $this->request->request->get('action', $this->request->input('action'));
         switch ($action) {
-            case 'autocomplete-subaccount':
-                $this->autocompleteSubaccount();
+            case 'autocomplete-account-prefix':
+                $this->autocompleteAccountPrefix();
                 return;
 
-            case 'add-deductible-subaccount':
-                $this->addDeductibleSubaccount();
-                return;
+            case 'add-account-prefix':
+                $this->addAccountPrefix();
+                break;
 
-            case 'delete-deductible-subaccount':
-                $this->deleteDeductibleSubaccount();
-                return;
+            case 'delete-account-prefix':
+                $this->deleteAccountPrefix();
+                break;
 
-            case 'add-income-subaccount':
-                $this->addIncomeSubaccount();
-                return;
-
-            case 'delete-income-subaccount':
-                $this->deleteIncomeSubaccount();
-                return;
+            case 'restore-account-prefixes':
+                $this->restoreAccountPrefixes();
+                break;
 
             case 'gen-accounting':
                 $this->createAccountingEntry();
                 return;
         }
 
+        DinModelo130Config::ensureDefaults();
+
         $this->codejercicio = $this->request->request->get('codejercicio', '');
         $this->period = $this->request->request->get('period', $this->period);
-        $this->applyGastosJustificacion = (bool)$this->request->request->get('applyGastosJustificacion', false);
+        $this->applyGastosJustificacion = (bool)$this->request->request->get(
+            'applyGastosJustificacion',
+            false
+        );
         $this->todeduct = (float)$this->request->request->get('todeduct', 20.0);
-        $this->gastosJustificacionPct = (float)$this->request->request->get('gastosJustificacionPct', 7.0);
+        $this->gastosJustificacionPct = (float)$this->request->request->get(
+            'gastosJustificacionPct',
+            5.0
+        );
 
-        $this->result = DinModelo130::generate($this->codejercicio, $this->period, $this->applyGastosJustificacion, $this->todeduct, $this->gastosJustificacionPct);
+        $this->result = DinModelo130::generate(
+            $this->codejercicio,
+            $this->period,
+            $this->applyGastosJustificacion,
+            $this->todeduct,
+            $this->gastosJustificacionPct
+        );
 
         if ($action === 'download') {
             $this->downloadFile($response);
         }
+    }
+
+
+    protected function addAccountPrefix(): void
+    {
+        $type = (string) $this->request->request->get('tipo');
+        $this->activeTab = $type === Mod130Conf::TIPO_INGRESO ? 'income-accounts' : 'expense-accounts';
+
+        if (false === $this->validateFormToken()) {
+            return;
+        }
+
+        $code = trim((string) $this->request->request->get('codigo'));
+        if (DinModelo130Config::hasOverlap($code)) {
+            Tools::log()->warning('model-130-overlapping-prefix');
+            return;
+        }
+
+        $rule = new Mod130Conf();
+        $rule->codigo = $code;
+        $rule->tipo = $type;
+        if (false === $rule->save()) {
+            Tools::log()->error('record-save-error');
+            return;
+        }
+
+        Tools::log()->notice('record-updated-correctly');
+    }
+
+    protected function autocompleteAccountPrefix(): void
+    {
+        $this->setTemplate(false);
+
+        $type = (string) $this->request->get('tipo');
+        $firstDigit = $type === Mod130Conf::TIPO_INGRESO ? '7' : '6';
+        $term = trim((string) $this->request->get('term'));
+        $safeTerm = $this->dataBase->var2str($term . '%');
+        $safeGroup = $this->dataBase->var2str($firstDigit . '%');
+
+        $sql = 'SELECT DISTINCT codcuenta, descripcion FROM cuentas'
+            . ' WHERE codcuenta LIKE ' . $safeGroup
+            . ' AND (codcuenta LIKE ' . $safeTerm
+            . ' OR descripcion LIKE ' . $this->dataBase->var2str('%' . $term . '%') . ')'
+            . ' ORDER BY codcuenta ASC';
+
+        $list = [];
+        foreach ($this->dataBase->selectLimit($sql, 50) as $row) {
+            $code = trim((string) $row['codcuenta']);
+            if ($code === '' || !ctype_digit($code)) {
+                continue;
+            }
+            $list[] = [
+                'key' => Tools::fixHtml($code),
+                'value' => Tools::fixHtml($code . ' · ' . $row['descripcion'])
+            ];
+        }
+
+        if (empty($list)) {
+            $list[] = ['key' => null, 'value' => Tools::lang()->trans('no-data')];
+        }
+
+        $this->response->setContent(json_encode($list));
+    }
+
+    protected function deleteAccountPrefix(): void
+    {
+        $type = (string) $this->request->request->get('tipo');
+        $this->activeTab = $type === Mod130Conf::TIPO_INGRESO ? 'income-accounts' : 'expense-accounts';
+
+        if (false === $this->validateFormToken()) {
+            return;
+        }
+
+        $rule = new Mod130Conf();
+        if (false === $rule->load((int) $this->request->request->get('id'))) {
+            Tools::log()->error('record-not-found');
+            return;
+        }
+
+        if (false === $rule->delete()) {
+            Tools::log()->error('record-deleted-error');
+            return;
+        }
+
+        Tools::log()->notice('record-deleted-correctly');
+    }
+
+    protected function restoreAccountPrefixes(): void
+    {
+        $this->activeTab = (string) $this->request->request->get('tab', 'expense-accounts');
+        if (false === $this->validateFormToken()) {
+            return;
+        }
+
+        if (DinModelo130Config::restoreDefaults()) {
+            Tools::log()->notice('model-130-defaults-restored');
+            return;
+        }
+        Tools::log()->error('record-save-error');
     }
 
     protected function downloadFile(Response $response): void
@@ -212,78 +323,40 @@ class Modelo130 extends Controller
             return;
         }
 
-        $content = DinModelo130Export::generate($this->result, $empresa, $this->period, $year);
+        $content = DinModelo130Export::generate(
+            $this->result,
+            $empresa,
+            $this->period,
+            $year
+        );
+
         if (strlen($content) !== DinModelo130Export::FILE_LENGTH) {
             Tools::log()->error('aeat-file-invalid-length');
             return;
         }
 
-        $filename = 'modelo130_' . $year . '_' . DinModelo130Export::getPeriodNumber($this->period) . '.txt';
+        $filename = 'modelo130_'
+            . $year
+            . '_'
+            . DinModelo130Export::getPeriodNumber($this->period)
+            . '.txt';
 
-        $response->headers->set('Content-Type', 'text/plain; charset=ISO-8859-1');
-        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-        $response->setContent(mb_convert_encoding($content, 'ISO-8859-1', 'UTF-8'));
+        $response->headers->set(
+            'Content-Type',
+            'text/plain; charset=ISO-8859-1'
+        );
+
+        $response->headers->set(
+            'Content-Disposition',
+            'attachment; filename="' . $filename . '"'
+        );
+
+        $response->setContent(
+            mb_convert_encoding($content, 'ISO-8859-1', 'UTF-8')
+        );
+
         $response->send();
         exit;
-    }
-
-    protected function addDeductibleSubaccount(): void
-    {
-        $this->activeTab = 'deductible-subaccount';
-
-        if (false === $this->validateFormToken()) {
-            return;
-        }
-
-        $subaccount130 = new Subcuenta130();
-        $subaccount130->codsubcuenta = $this->request->request->get('codsubcuenta');
-        if (false === $subaccount130->save()) {
-            Tools::log()->error('record-save-error');
-            return;
-        }
-
-        Tools::log()->notice('record-updated-correctly');
-    }
-
-    protected function addIncomeSubaccount(): void
-    {
-        $this->activeTab = 'income-subaccount';
-
-        if (false === $this->validateFormToken()) {
-            return;
-        }
-
-        $subaccount = new Subcuenta130();
-        $subaccount->codsubcuenta = $this->request->request->get('codsubcuenta');
-        $subaccount->tipo = Subcuenta130::TIPO_INGRESO;
-        if (false === $subaccount->save()) {
-            Tools::log()->error('record-save-error');
-            return;
-        }
-
-        Tools::log()->notice('record-updated-correctly');
-    }
-
-    protected function autocompleteSubaccount(): void
-    {
-        $this->setTemplate(false);
-
-        $list = [];
-        $term = $this->request->get('term');
-        $sql = 'SELECT DISTINCT codsubcuenta, descripcion FROM subcuentas WHERE codsubcuenta LIKE "' . $term . '%";';
-
-        foreach ($this->dataBase->select($sql) as $value) {
-            $list[] = [
-                'key' => Tools::fixHtml($value['codsubcuenta']),
-                'value' => Tools::fixHtml($value['descripcion'])
-            ];
-        }
-
-        if (empty($list)) {
-            $list[] = ['key' => null, 'value' => Tools::lang()->trans('no-data')];
-        }
-
-        $this->response->setContent(json_encode($list));
     }
 
     protected function createAccountingEntry(): void
@@ -299,52 +372,17 @@ class Modelo130 extends Controller
         $amount = (float)$this->request->request->get('amount');
         $paymentMethodId = (int)$this->request->request->get('paymentMethod');
 
-        if (DinModelo130::generateEntries($idempresa, $codejercicio, $period, $date, $amount, $paymentMethodId)) {
+        if (
+            DinModelo130::generateEntries(
+                $idempresa,
+                $codejercicio,
+                $period,
+                $date,
+                $amount,
+                $paymentMethodId
+            )
+        ) {
             Tools::log()->notice('record-updated-correctly');
         }
-    }
-
-    protected function deleteDeductibleSubaccount(): void
-    {
-        $this->activeTab = 'deductible-subaccount';
-
-        if (false === $this->validateFormToken()) {
-            return;
-        }
-
-        $subaccount130 = new Subcuenta130();
-        if (false === $subaccount130->load($this->request->request->get('id'))) {
-            Tools::log()->error('record-not-found');
-            return;
-        }
-
-        if (false === $subaccount130->delete()) {
-            Tools::log()->error('record-deleted-error');
-            return;
-        }
-
-        Tools::log()->notice('record-deleted-correctly');
-    }
-
-    protected function deleteIncomeSubaccount(): void
-    {
-        $this->activeTab = 'income-subaccount';
-
-        if (false === $this->validateFormToken()) {
-            return;
-        }
-
-        $subaccount = new Subcuenta130();
-        if (false === $subaccount->load($this->request->request->get('id'))) {
-            Tools::log()->error('record-not-found');
-            return;
-        }
-
-        if (false === $subaccount->delete()) {
-            Tools::log()->error('record-deleted-error');
-            return;
-        }
-
-        Tools::log()->notice('record-deleted-correctly');
     }
 }
